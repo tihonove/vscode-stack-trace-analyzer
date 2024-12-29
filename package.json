@@ -1,8 +1,9 @@
 {
 	"name": "stack-trace-analyzer",
 	"description": "Stack trace analyzer - Easy way to analyze stack traces from any language and sources",
-	"version": "0.0.1",
+	"version": "0.0.3",
 	"license": "MIT",
+	"publisher": "Eugene Tihonov",
 	"engines": {
 		"vscode": "^1.74.0"
 	},
