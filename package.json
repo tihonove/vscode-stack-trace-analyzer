@@ -6,6 +6,10 @@
 	"engines": {
 		"vscode": "^1.74.0"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tihonove/vscode-stack-trace-analyzer.git"
+	},
 	"extensionKind": [
 		"ui",
 		"workspace"
@@ -21,7 +25,7 @@
 		"docs",
 		"package.json",
 		"logo.png",
-		"README.md"
+		"LICENSE.md"
 	],
 	"contributes": {
 		"viewsContainers": {
