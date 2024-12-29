@@ -1,0 +1,56 @@
+{
+	"name": "stack-trace-analyzer",
+	"description": "Calico Colors - A Webview View API Sample",
+	"version": "0.0.1",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.74.0"
+	},
+	"extensionKind": ["ui", "workspace"],
+	"categories": ["Programming Languages"],
+	"activationEvents": [],
+	"main": "./src/extension.js",
+	"contributes": {
+		"viewsContainers": {
+			"panel": [
+				{
+					"id": "stack-trace-analyzer-view-container",
+					"title": "Analyze stack trace",
+					"icon": "src/stacktrace.svg"
+			  	}
+			]
+		},
+		"views": {
+			"stack-trace-analyzer-view-container": [
+				{
+					"id": "stack-trace-analyzer.root",
+					"type": "webview",
+					"name": "Stack trace analyzer"
+				}
+			]
+		},
+		"commands": [
+			{
+				"command": "stack-trace-analyzer.analyzeStackTraceFromClipboard",
+				"category": "Stack Trace Analyzer",
+				"title": "Analyze stack from clipboard"
+			},
+			{
+				"command": "stack-trace-analyzer.clearAnalyizedStackTraces",
+				"category": "Stack Trace Analyzer",
+				"title": "Clear analyzed stack traces"
+			}
+		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "stack-trace-analyzer.clearAnalyizedStackTraces",
+					"group": "navigation",
+					"when": "view == stack-trace-analyzer.root"
+				}
+			]
+		}
+	},
+	"scripts": {
+	}
+}
