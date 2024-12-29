@@ -1,4 +1,5 @@
 const vscode = require("vscode");
+const { splitIntoTokens, getPossibleFilePathsToSearch } = require("./stackTraceSplitter.js");
 
 let view;
 
@@ -7,16 +8,18 @@ function activate(context) {
         resolveWebviewView: webviewView => {
             view = webviewView;
             webviewView.webview.options = { enableScripts: true };
-            webviewView.webview.html = getHtmlForWebview(webviewView.webview);
+            webviewView.webview.html = getHtmlForWebview();
             webviewView.webview.onDidReceiveMessage(async data => {
                 switch (data.type) {
                     case "openFile": {
-                        const a = await vscode.workspace.findFiles("src/Neurons/Neurons.ts");
-                        const doc = await vscode.workspace.openTextDocument(a[0]);
+                        const doc = await vscode.workspace.openTextDocument(data.fileUriPath);
                         const editor = await vscode.window.showTextDocument(doc);
-                        const position = new vscode.Position(10, 10);
-                        const newSelection = new vscode.Selection(position, position);
-                        editor.selection = newSelection;
+                        if (data.line != undefined) {
+                            const position = new vscode.Position(data.line - 1, 0);
+                            const newSelection = new vscode.Selection(position, position);
+                            editor.selection = newSelection;
+                            editor.revealRange(newSelection, vscode.TextEditorRevealType.InCenter);
+                        }
                         break;
                     }
                 }
@@ -26,66 +29,129 @@ function activate(context) {
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider("stack-trace-analyzer.root", provider));
 
+    // const symbols = await vscode.commands.executeCommand(
+    //     'vscode.executeWorkspaceSymbolProvider', 'forward NeuralLayer'
+    // );
+    // console.log(symbols);
+
     context.subscriptions.push(
         vscode.commands.registerCommand("stack-trace-analyzer.analyzeStackTraceFromClipboard", async () => {
-            const text = await vscode.env.clipboard.readText();
+            if (view == undefined) {
+                await vscode.commands.executeCommand("stack-trace-analyzer.root.focus");
+            }
+            let text = await vscode.env.clipboard.readText();
             view.show?.(true);
-            view.webview.postMessage({ type: "setText", text: text });
+
+            await vscode.window.withProgress(
+                {
+                    location: vscode.ProgressLocation.Window,
+                    title: "Analyzing stack trace...",
+                    cancellable: false,
+                },
+                async () => {
+                    const linesTokens = splitIntoTokens(text);
+                    view.webview.postMessage({
+                        type: "setStacktracePreview",
+                        lines: linesTokens.map(lineTokens => lineTokens.map(t => [t[0]])),
+                    });
+                    const linesVsCodeTokens = await Promise.all(
+                        linesTokens.map(async lineTokens => {
+                            return await Promise.all(
+                                lineTokens.map(async ([line, meta]) => {
+                                    if (meta == undefined) return [line];
+
+                                    for (const possibleFilePath of getPossibleFilePathsToSearch(meta.filePath)) {
+                                        const uris = await vscode.workspace.findFiles(possibleFilePath);
+                                        if (uris.length > 0) {
+                                            return [line, { fileUriPath: uris[0].path, line: meta.line }];
+                                        }
+                                    }
+                                    return [line];
+                                })
+                            );
+                        })
+                    );
+                    view.webview.postMessage({ type: "addAnalyzedStackTrace", lines: linesVsCodeTokens });
+                }
+            );
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand("stack-trace-analyzer.clearAnalyizedStackTraces", () => {
-            view.webview.postMessage({ type: "clearColors" });
+            if (view == undefined) return;
+            view.webview.postMessage({ type: "clearAnalyizedStackTraces" });
         })
     );
 }
 
-function getHtmlForWebview(webview) {
+function getHtmlForWebview() {
     const nonce = getNonce();
 
     return `<!DOCTYPE html>
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'unsafe-inline';">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>Cat Colors</title>
+            <style nonce="${nonce}">
+                #current-stack-trace {
+                    font-family: monospace;
+                    white-space: pre-wrap;
+                }
+            </style>
 		</head>
 		<body>
+            <div id="current-stack-trace">
+                <div>Call 'Analyze stack trace from clipboard' to see the stack trace</div>
+            </div>
 			<script nonce="${nonce}">
 				const vscode = acquireVsCodeApi();
 
-				window.addEventListener('message', event => {
-					console.log(event);
-					const message = event.data; // The json data that the extension sent
+				window.addEventListener('message', async event => {
+					const message = event.data;
 					switch (message.type) {
-						case 'setText':
+						case 'setStacktracePreview':
+						case 'addAnalyzedStackTrace':
 							{
-								document.body.style.backgroundColor = 'blue';
-								document.querySelector('#buffer').value = message.text;
+                                const element = document.querySelector('#current-stack-trace');
+                                element.innerText = "";
+                                for (const lineTokens of message.lines) {
+                                    const lineElement = document.createElement('div');
+                                    for (const token of lineTokens) {
+                                        const tokenText = token[0]; 
+                                        let tokenElement;
+                                        if (token[1] != undefined) {
+                                            tokenElement = document.createElement('a');
+                                            tokenElement.innerText = tokenText;
+                                            tokenElement.href = "#";
+                                            tokenElement.onclick = () => {
+                                                vscode.postMessage({
+                                                    type: 'openFile',
+                                                    fileUriPath: token[1].fileUriPath,
+                                                    line: token[1].line
+                                                });
+                                            };
+                                        } else {
+                                            tokenElement = document.createElement('span');
+                                            tokenElement.innerText = tokenText;
+                                        }
+                                        lineElement.appendChild(tokenElement);
+                                    }
+                                    element.appendChild(lineElement);
+                                }
+
 								break;
 							}
-						case 'clearColors':
+						case 'clearAnalyizedStackTraces':
 							{
-								document.body.style.backgroundColor = 'red';
-								document.querySelector('#buffer').value = "";
+								document.querySelector('#current-stack-trace').innerText = "Call 'Analyze stack trace from clipboard' to see the stack trace";
 								break;
 							}
 					}
 				});
-
-				document.body.style.backgroundColor = 'red';
-
-				function openFile() {
-					vscode.postMessage({
-						type: 'openFile',
-						value: ''
-					});
-				}
 			</script>
-			<input type="text" id="buffer" />
-			<button onclick="openFile()">Open</button>
 		</body>
 		</html>`;
 }
