@@ -12,10 +12,11 @@ function activate(context) {
             webviewView.webview.onDidReceiveMessage(async data => {
                 switch (data.type) {
                     case "openFile": {
-                        const doc = await vscode.workspace.openTextDocument(data.fileUriPath);
+                        const tokenMeta = data.tokenMeta;
+                        const doc = await vscode.workspace.openTextDocument(tokenMeta.fileUriPath);
                         const editor = await vscode.window.showTextDocument(doc);
-                        if (data.line != undefined) {
-                            const position = new vscode.Position(data.line - 1, 0);
+                        if (tokenMeta.line != undefined) {
+                            const position = new vscode.Position(tokenMeta.line - 1, (tokenMeta.column ?? 1) - 1);
                             const newSelection = new vscode.Selection(position, position);
                             editor.selection = newSelection;
                             editor.revealRange(newSelection, vscode.TextEditorRevealType.InCenter);
@@ -59,11 +60,11 @@ function activate(context) {
                             return await Promise.all(
                                 lineTokens.map(async ([line, meta]) => {
                                     if (meta == undefined) return [line];
-
-                                    for (const possibleFilePath of getPossibleFilePathsToSearch(meta.filePath)) {
+                                    const { filePath, ...tokenMeta } = meta;
+                                    for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
                                         const uris = await vscode.workspace.findFiles(possibleFilePath);
                                         if (uris.length > 0) {
-                                            return [line, { fileUriPath: uris[0].path, line: meta.line }];
+                                            return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
                                         }
                                     }
                                     return [line];
@@ -129,8 +130,7 @@ function getHtmlForWebview() {
                                             tokenElement.onclick = () => {
                                                 vscode.postMessage({
                                                     type: 'openFile',
-                                                    fileUriPath: token[1].fileUriPath,
-                                                    line: token[1].line
+                                                    tokenMeta: token[1],
                                                 });
                                             };
                                         } else {

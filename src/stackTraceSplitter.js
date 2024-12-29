@@ -1,9 +1,15 @@
 const tokenizers = [
     [
-        /(\/([^\/:]+\/)*([^\/:]+\.([\d\w]{2,5})))(:(line )?(\d+))/gi,
-        m => ({ type: "FullFilePathWithLine", filePath: m[1], line: Number(m[7]) }),
+        /((?:(?:\w\:\\)|[\/\\\d\w\.])([^\/\\\s\(\):]+[\/\\])+([^\\\/\s\(\):]+\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
+        m => {
+            const result = { type: "FullFilePathWithLine", filePath: m[1], line: Number(m[7]) };
+            if (m[9]) {
+                result.column = Number(m[9]);
+            }
+            return result;
+        },
     ],
-    [/\/([^\/:]+\/)*([^\/:]+\.([\d\w]{2,5}))/gi, m => ({ type: "FullFilePath", filePath: m[0] })],
+    [/(?:(?:\w\:\\)|[\/\\\d\w\.])([^\/\\\s\(\):]+[\/\\])+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi, m => ({ type: "FullFilePath", filePath: m[0] })],
 ];
 
 function splitByRegex(input, regex, tokenFactory) {
@@ -49,7 +55,7 @@ exports.splitIntoTokens = function splitIntoTokens(trace) {
 };
 
 exports.getPossibleFilePathsToSearch = function* getPossibleFilePathsToSearch(filePath) {
-    const parts = filePath.split("/");
+    const parts = filePath.split(/[\/\\]/);
     const result = [];
     for (let i = 0; i < parts.length; i++) {
         yield parts.slice(i).join("/");
