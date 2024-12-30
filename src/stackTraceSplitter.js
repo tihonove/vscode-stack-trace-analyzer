@@ -1,16 +1,18 @@
 const tokenizers = [
     [
-        /((?:(?:\w\:\\)|[\/\\\d\w\.])([^\/\\\s\(\):]+[\/\\])+([^\\\/\s\(\):]+\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
+        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\\\/\s\(\):]+\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
         m => {
-            const result = { type: "FullFilePathWithLine", filePath: m[1], line: Number(m[7]) };
+            const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
             if (m[9]) {
                 result.column = Number(m[9]);
             }
             return result;
         },
     ],
-    [/(?:(?:\w\:\\)|[\/\\\d\w\.])([^\/\\\s\(\):]+[\/\\])+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi, m => ({ type: "FullFilePath", filePath: m[0] })],
+    [/(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi, m => ({ type: "FullFilePath", filePath: normalizeFilePath(m[0]) })],
 ];
+
+const normalizeFilePath = filePath => filePath.replace(/[\/\\]+/g, '/');
 
 function splitByRegex(input, regex, tokenFactory) {
     const result = [];

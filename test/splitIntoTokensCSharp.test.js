@@ -30,6 +30,35 @@ Kontur.FormsClassification.Exceptions.InvalidGFVException: Invalid GFV: 0. Ид�
         ]);
     });
 
+    test("Sample trace", () => {
+        const trace = `
+Kontur.FormsClassification.Exceptions.InvalidGFVException: Invalid GFV: 0. Идентификатор формы не может быть меньше 100101.
+   at Kontur.FormsClassification.Tools.IdHelperCore.CheckFormatId(Int32 id) in \\/builds\\/forms\\/forms\\/forms.classification\\/Classification.Core\\/Tools\\/IdHelperCore.cs:line 52
+   at Kontur.FormsClassification.Classification.GetFormat(Int32 gf) in \\/builds\\/forms\\/forms\\/forms.classification\\/Classification.Core\\/Classification.cs:line 46
+   at Kontur.FormsClassification.Trash.ClassificationTrash.IsNdsDeclaration(Int32 gfv) in \\/builds\\/forms\\/forms\\/forms.classification\\/Classification.Core\\/Trash\\/ClassificationTrash.cs:line 470
+   at Kontur.Forms.Api.Nds.Workers.DraftPreparer.SubWorkers.ProcessMakeFufResult.DoWorkAsync(DraftPrepareTask task, MakeFufWorkerResult makeFufResult, CancellationToken cancellationToken) in \\/builds\\/forms\\/forms\\/forms\\/Api.Nds\\/Workers\\/DraftPreparer\\/SubWorkers\\/ProcessMakeFufResult.cs:line 61
+   at Kontur.Forms.Api.Nds.Controllers.DraftPrepareController.DoWorkAsync(DraftPrepareInput task, CancellationToken cancellationToken) in \\/builds\\/forms\\/forms\\/forms\\/Api.Nds\\/Controllers\\/DraftPrepareController.cs:line 36
+   at Kontur.Forms.Core.Jobs.Controllers.ActionResults.ActionResultUnwrapper.UnwrapAsync(Type resultType, Object result) in \\/builds\\/forms\\/forms\\/forms.core.jobs\\/Core.Jobs\\/Controllers\\/ActionResults\\/ActionResultUnwrapper.cs:line 41
+   at Kontur.Forms.Core.Jobs.Controllers.Actions.ControllerAction.ControllerActionInvoker.InvokeAsync(Object controllerInstance) in \\/builds\\/forms\\/forms\\/forms.core.jobs\\/Core.Jobs\\/Controllers\\/Actions\\/ControllerAction.cs:line 97
+   at Kontur.Forms.Core.Jobs.Controllers.Invocation.JobControllerMainInvoker.InvokeAsync(IJobController jobController, JobInfo jobInfo, CancellationToken cancellationToken) in \\/builds\\/forms\\/forms\\/forms.core.jobs\\/Core.Jobs\\/Controllers\\/Invocation\\/JobControllerMainInvoker.cs:line 49
+   at Kontur.Forms.Core.Jobs.Controllers.Routing.RoutedJobImplementation.InvokeMainInvokerAsync(JobInfo jobInfo, CancellationToken cancellationToken) in \\/builds\\/forms\\/forms\\/forms.core.jobs\\/Core.Jobs\\/Controllers\\/Routing\\/RoutedJobImplementation.cs:line 65
+   at Kontur.Forms.Core.Jobs.Controllers.Routing.RoutedJobImplementation.ExecuteJobAsync(JobInfo jobInfo, CancellationToken cancellationToken) in \\/builds\\/forms\\/forms\\/forms.core.jobs\\/Core.Jobs\\/Controllers\\/Routing\\/RoutedJobImplementation.cs:line 57
+        `;
+
+        var matches = splitIntoTokens(trace);
+        expect(matches[2]).toEqual([
+            ["   at Kontur.FormsClassification.Tools.IdHelperCore.CheckFormatId(Int32 id) in "],
+            [
+                "\\/builds\\/forms\\/forms\\/forms.classification\\/Classification.Core\\/Tools\\/IdHelperCore.cs:line 52",
+                {
+                    type: "FullFilePathWithLine",
+                    filePath: "/builds/forms/forms/forms.classification/Classification.Core/Tools/IdHelperCore.cs",
+                    line: 52,
+                },
+            ],
+        ]);
+    });
+
     test("Winfows paths", () => {
         const trace = `
 DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadRequest), SystemMessage: {"type":"https://tools.ietf.org/html/rfc9110#section-15.5.1","title":"One or more validation errors occurred.","status":400,"errors":{"offset":["Value must be more than or equal to 0"]},"traceId":"00-586e78054c1252e9237b0964a19b8e5f-559cfd46d4c4dbf5-01"}, ApiClientMessage: , UserMessage: {"type":"https://tools.ietf.org/html/rfc9110#section-15.5.1","title":"One or more validation errors occurred.","status":400,"errors":{"offset":["Value must be more than or equal to 0"]},"traceId":"00-586e78054c1252e9237b0964a19b8e5f-559cfd46d4c4dbf5-01"}, IgnoreDisabling: False
@@ -98,7 +127,7 @@ DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadReque
                 "C:\\BuildAgent\\work\\124ea67cdf592b6d\\_Src\\Services.Boxes\\Diadoc.PublicApi.Implementation.Boxes\\PublicApi\\Services\\Employees\\ApiEmployeesService.cs:88:4",
                 {
                     type: "FullFilePathWithLine",
-                    filePath: "C:\\BuildAgent\\work\\124ea67cdf592b6d\\_Src\\Services.Boxes\\Diadoc.PublicApi.Implementation.Boxes\\PublicApi\\Services\\Employees\\ApiEmployeesService.cs",
+                    filePath: "C:/BuildAgent/work/124ea67cdf592b6d/_Src/Services.Boxes/Diadoc.PublicApi.Implementation.Boxes/PublicApi/Services/Employees/ApiEmployeesService.cs",
                     line: 88,
                     column: 4,
                 },
