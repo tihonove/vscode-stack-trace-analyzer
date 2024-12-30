@@ -1,7 +1,7 @@
 {
 	"name": "stack-trace-analyzer",
 	"description": "Stack trace analyzer - Easy way to analyze stack traces from any language and sources",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"license": "MIT",
 	"engines": {
 		"vscode": "^1.74.0"
