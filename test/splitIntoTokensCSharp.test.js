@@ -59,6 +59,31 @@ Kontur.FormsClassification.Exceptions.InvalidGFVException: Invalid GFV: 0. Ид�
         ]);
     });
 
+    test("Single lined trace", () => {
+        const trace = `
+                {
+                    "stack": "Error: Something went wrong\n    at Object.<anonymous> (C:\\\\\\\\path\\\\\\\\to\\\\\\\\file.js:10:15)\n    at Module._compile (internal/modules/cjs/loader.js:778:30)\n    at Object.Module._extensions..js (internal/modules/cjs/loader.js:789:10)\n    at Module.load (internal/modules/cjs/loader.js:653:32)\n    at tryModuleLoad (internal/modules/cjs/loader.js:593:12)\n    at Function.Module._load (internal/modules/cjs/loader.js:585:3)\n    at Function.Module.runMain (internal/modules/cjs/loader.js:831:12)\n    at startup (internal/bootstrap/node.js:283:19)\n    at bootstrapNodeJSCore (internal/bootstrap/node.js:622:3)"
+                }`;
+
+        var matches = splitIntoTokens(trace);
+        expect(matches[0]).toEqual([]);
+        expect(matches[1]).toEqual([["                {"]]);
+        expect(matches[2]).toEqual([['                    "stack": "Error: Something went wrong']]);
+        expect(matches[3]).toEqual([
+            ["    at Object.<anonymous> ("],
+            [
+                "C:\\\\\\\\path\\\\\\\\to\\\\\\\\file.js:10:15",
+                {
+                    column: 15,
+                    filePath: "C:/path/to/file.js",
+                    line: 10,
+                    type: "FullFilePathWithLine",
+                },
+            ],
+            [")"],
+        ]);
+    });
+
     test("Winfows paths", () => {
         const trace = `
 DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadRequest), SystemMessage: {"type":"https://tools.ietf.org/html/rfc9110#section-15.5.1","title":"One or more validation errors occurred.","status":400,"errors":{"offset":["Value must be more than or equal to 0"]},"traceId":"00-586e78054c1252e9237b0964a19b8e5f-559cfd46d4c4dbf5-01"}, ApiClientMessage: , UserMessage: {"type":"https://tools.ietf.org/html/rfc9110#section-15.5.1","title":"One or more validation errors occurred.","status":400,"errors":{"offset":["Value must be more than or equal to 0"]},"traceId":"00-586e78054c1252e9237b0964a19b8e5f-559cfd46d4c4dbf5-01"}, IgnoreDisabling: False
@@ -122,17 +147,20 @@ DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadReque
 
         var matches = splitIntoTokens(trace);
         expect(matches[7]).toEqual([
-            ["    at Diadoc.PublicApi.Implementation.Boxes.PublicApi.Services.Employees.ApiEmployeesService+<GetAllPagedAsync>d__6.MoveNext("],
+            [
+                "    at Diadoc.PublicApi.Implementation.Boxes.PublicApi.Services.Employees.ApiEmployeesService+<GetAllPagedAsync>d__6.MoveNext(",
+            ],
             [
                 "C:\\BuildAgent\\work\\124ea67cdf592b6d\\_Src\\Services.Boxes\\Diadoc.PublicApi.Implementation.Boxes\\PublicApi\\Services\\Employees\\ApiEmployeesService.cs:88:4",
                 {
                     type: "FullFilePathWithLine",
-                    filePath: "C:/BuildAgent/work/124ea67cdf592b6d/_Src/Services.Boxes/Diadoc.PublicApi.Implementation.Boxes/PublicApi/Services/Employees/ApiEmployeesService.cs",
+                    filePath:
+                        "C:/BuildAgent/work/124ea67cdf592b6d/_Src/Services.Boxes/Diadoc.PublicApi.Implementation.Boxes/PublicApi/Services/Employees/ApiEmployeesService.cs",
                     line: 88,
                     column: 4,
                 },
             ],
-            [")"]
+            [")"],
         ]);
     });
 });

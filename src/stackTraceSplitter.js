@@ -9,10 +9,13 @@ const tokenizers = [
             return result;
         },
     ],
-    [/(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi, m => ({ type: "FullFilePath", filePath: normalizeFilePath(m[0]) })],
+    [
+        /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi,
+        m => ({ type: "FullFilePath", filePath: normalizeFilePath(m[0]) }),
+    ],
 ];
 
-const normalizeFilePath = filePath => filePath.replace(/[\/\\]+/g, '/');
+const normalizeFilePath = filePath => filePath.replace(/[\/\\]+/g, "/");
 
 function splitByRegex(input, regex, tokenFactory) {
     const result = [];
@@ -32,26 +35,44 @@ function splitByRegex(input, regex, tokenFactory) {
     return result;
 }
 
+function regexMatchCount(str, regex) {
+    let count = 0;
+    let match;
+    while ((match = regex.exec(str)) !== null) {
+        count++;
+    }
+    return count;
+}
+
 exports.splitIntoTokens = function splitIntoTokens(trace) {
     const result = [];
     const lines = trace.split("\n");
 
-    for (const line of lines) {
-        let lineTokens = [[line]];
-
-        for (const tokenizer of tokenizers) {
-            const nextTokens = [];
-            for (const lineToken of lineTokens) {
-                if (lineToken.length == 1) {
-                    const result = splitByRegex(lineToken[0], tokenizer[0], tokenizer[1]);
-                    nextTokens.push(...result);
-                } else {
-                    nextTokens.push(lineToken);
-                }
-            }
-            lineTokens = nextTokens;
+    for (const preline of lines) {
+        const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/ig);
+        if (preline.length / (escapedNewLineCount - 1) > 100 || (preline.length / 240 && escapedNewLineCount > 5)) {
+            lineOfLines = preline.replace(/\\n/gi, "\n").split("\n");
+        } else {
+            lineOfLines = [preline];
         }
-        result.push(lineTokens);
+
+        for (const line of lineOfLines) {
+            let lineTokens = [[line]];
+
+            for (const tokenizer of tokenizers) {
+                const nextTokens = [];
+                for (const lineToken of lineTokens) {
+                    if (lineToken.length == 1) {
+                        const result = splitByRegex(lineToken[0], tokenizer[0], tokenizer[1]);
+                        nextTokens.push(...result);
+                    } else {
+                        nextTokens.push(lineToken);
+                    }
+                }
+                lineTokens = nextTokens;
+            }
+            result.push(lineTokens);
+        }
     }
     return result;
 };
