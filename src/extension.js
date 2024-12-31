@@ -88,8 +88,10 @@ function activate(context) {
     );
 }
 
+const randomString10 = () => (Math.random() + 1).toString(36).substring(2);
+
 function getHtmlForWebview() {
-    const nonce = getNonce();
+    const nonce = randomString10();
 
     return `<!DOCTYPE html>
 		<html lang="en">
@@ -106,9 +108,7 @@ function getHtmlForWebview() {
             </style>
 		</head>
 		<body>
-            <div id="current-stack-trace">
-                <div>Call 'Analyze stack trace from clipboard' to see the stack trace</div>
-            </div>
+            <div id="current-stack-trace">Call 'Analyze stack trace from clipboard' to see the stack trace</div>
 			<script nonce="${nonce}">
 				const vscode = acquireVsCodeApi();
 
@@ -156,15 +156,6 @@ function getHtmlForWebview() {
 			</script>
 		</body>
 		</html>`;
-}
-
-function getNonce() {
-    let text = "";
-    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
 }
 
 module.exports = {
