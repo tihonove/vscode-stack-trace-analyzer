@@ -8,4 +8,18 @@ categories:
       labels:
           - "fix"
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
-version-resolver: "patch"
+version-resolver:
+    type: "patch"
+
+template: |
+    ## 🚀 Features
+    $CHANGES
+
+    ## 🛠 Maintenance
+    $OTHER_CHANGES
+
+    **Thank you to our contributors!**
+    $CONTRIBUTORS
+
+exclude-labels:
+    - "skip-changelog"

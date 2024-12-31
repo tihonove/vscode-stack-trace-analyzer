@@ -22,10 +22,10 @@ jobs:
             - name: Install vsce
               run: npm install -g @vscode/vsce
 
-            - name: Publish Extension
-              env:
-                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
-              run: vsce publish --no-git-tag-version
+            # - name: Publish Extension
+            #   env:
+            #       VSCE_PAT: ${{ secrets.VSCE_PAT }}
+            #   run: vsce publish --no-git-tag-version
 
             - name: Generate Release Notes
               id: generate_notes
