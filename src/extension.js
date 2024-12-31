@@ -35,8 +35,9 @@ function activate(context) {
             if (view == undefined) {
                 await vscode.commands.executeCommand("stack-trace-analyzer.root.focus");
             }
-            view.show?.(true);
-
+            if (view != undefined) { 
+                view.show?.(true);
+            }
             const clipboardContent = await vscode.env.clipboard.readText();
             await vscode.window.withProgress(
                 {
@@ -46,10 +47,12 @@ function activate(context) {
                 },
                 async (_, cancellationToken) => {
                     const linesTokens = splitIntoTokens(clipboardContent);
-                    view.webview.postMessage({
-                        type: "setStacktracePreview",
-                        lines: linesTokens.map(lineTokens => lineTokens.map(t => [t[0]])),
-                    });
+                    if (view != undefined) {
+                        view.webview.postMessage({
+                            type: "setStacktracePreview",
+                            lines: linesTokens.map(lineTokens => lineTokens.map(t => [t[0]])),
+                        });
+                    }
                     const linesVsCodeTokens = await Promise.all(
                         linesTokens.map(async lineTokens => {
                             return await Promise.all(
@@ -67,7 +70,11 @@ function activate(context) {
                             );    
                         })
                     );
-                    view.webview.postMessage({ type: "addAnalyzedStackTrace", lines: linesVsCodeTokens });
+                    if (view != undefined) {
+                        view.webview.postMessage({ type: "addAnalyzedStackTrace", lines: linesVsCodeTokens });
+                    } else {
+                        vscode.window.showInformationMessage("Extension is still initializing, please wait...");
+                    }
                 }
             );
         })
