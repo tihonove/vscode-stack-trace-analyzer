@@ -5,5 +5,7 @@
 *.json text eol=lf
 *.md text eol=lf
 *.svg text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 .prettierrc text eol=lf
 .gitignore text eol=lf

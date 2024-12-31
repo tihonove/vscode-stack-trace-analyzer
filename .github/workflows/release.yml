@@ -7,9 +7,6 @@ on:
         branches:
             - main
         
-permissions:
-    contents: write
-
 jobs:
     publish:
         runs-on: ubuntu-latest
@@ -27,15 +24,7 @@ jobs:
             - name: Install vsce
               run: npm install -g @vscode/vsce
 
-            # - name: Publish Extension
-            #   env:
-            #       VSCE_PAT: ${{ secrets.VSCE_PAT }}
-            #   run: vsce publish --no-git-tag-version
-
-            - name: Generate Release Notes
-              id: generate_notes
-              uses: release-drafter/release-drafter@v5
+            - name: Publish Extension
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  config-name: release-drafter.yml
+                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
+              run: vsce publish --no-git-tag-version
