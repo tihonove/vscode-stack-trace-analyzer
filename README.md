@@ -26,6 +26,7 @@ Stack trace analyzer - Easy way to analyze stack traces from any language and so
 ## Troubleshooting
 
 If your stack trace is not working, please open an issue on [GitHub](https://github.com/tihonove/vscode-stack-trace-analyzer/issues).
+Successfully tested on C# and JavaScript projects, but it should work well with any stack traces that contain file paths resembling source code.
 
 ## License
 
