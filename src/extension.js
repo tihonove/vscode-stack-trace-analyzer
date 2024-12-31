@@ -13,8 +13,8 @@ function activate(context) {
                 switch (data.type) {
                     case "openFile": {
                         const tokenMeta = data.tokenMeta;
-                        const doc = await vscode.workspace.openTextDocument(tokenMeta.fileUriPath);
-                        const editor = await vscode.window.showTextDocument(doc);
+                        const textDocument = await vscode.workspace.openTextDocument(tokenMeta.fileUriPath);
+                        const editor = await vscode.window.showTextDocument(textDocument);
                         if (tokenMeta.line != undefined) {
                             const position = new vscode.Position(tokenMeta.line - 1, (tokenMeta.column ?? 1) - 1);
                             const newSelection = new vscode.Selection(position, position);
@@ -30,11 +30,6 @@ function activate(context) {
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider("stack-trace-analyzer.root", provider));
 
-    // const symbols = await vscode.commands.executeCommand(
-    //     'vscode.executeWorkspaceSymbolProvider', 'forward NeuralLayer'
-    // );
-    // console.log(symbols);
-
     context.subscriptions.push(
         vscode.commands.registerCommand("stack-trace-analyzer.analyzeStackTraceFromClipboard", async () => {
             if (view == undefined) {
@@ -47,9 +42,9 @@ function activate(context) {
                 {
                     location: vscode.ProgressLocation.Window,
                     title: "Analyzing stack trace...",
-                    cancellable: false,
+                    cancellable: true,
                 },
-                async () => {
+                async (_, cancellationToken) => {
                     const linesTokens = splitIntoTokens(text);
                     view.webview.postMessage({
                         type: "setStacktracePreview",
@@ -59,17 +54,17 @@ function activate(context) {
                         linesTokens.map(async lineTokens => {
                             return await Promise.all(
                                 lineTokens.map(async ([line, meta]) => {
-                                    if (meta == undefined) return [line];
+                                    if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
                                     const { filePath, ...tokenMeta } = meta;
                                     for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
-                                        const uris = await vscode.workspace.findFiles(possibleFilePath);
+                                        const uris = await vscode.workspace.findFiles(possibleFilePath, null, 1, cancellationToken);
                                         if (uris.length > 0) {
                                             return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
                                         }
-                                    }
+                                    }    
                                     return [line];
                                 })
-                            );
+                            );    
                         })
                     );
                     view.webview.postMessage({ type: "addAnalyzedStackTrace", lines: linesVsCodeTokens });
