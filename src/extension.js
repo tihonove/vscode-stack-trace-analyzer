@@ -35,9 +35,9 @@ function activate(context) {
             if (view == undefined) {
                 await vscode.commands.executeCommand("stack-trace-analyzer.root.focus");
             }
-            let text = await vscode.env.clipboard.readText();
             view.show?.(true);
 
+            const clipboardContent = await vscode.env.clipboard.readText();
             await vscode.window.withProgress(
                 {
                     location: vscode.ProgressLocation.Window,
@@ -45,7 +45,7 @@ function activate(context) {
                     cancellable: true,
                 },
                 async (_, cancellationToken) => {
-                    const linesTokens = splitIntoTokens(text);
+                    const linesTokens = splitIntoTokens(clipboardContent);
                     view.webview.postMessage({
                         type: "setStacktracePreview",
                         lines: linesTokens.map(lineTokens => lineTokens.map(t => [t[0]])),
