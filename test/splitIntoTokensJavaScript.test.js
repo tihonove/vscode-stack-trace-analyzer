@@ -16,12 +16,17 @@ See diff for details: C:\\BuildAgent\\work\\forms-root-all\\diadoc.forms\\candy.
         `;
 
         var matches = splitIntoTokens(trace);
+        console.log(matches[5]);
+        
         expect(matches[5]).toEqual([
-            ["    at checkScreenshot ("],
+            [ '    ' ],
+            [ 'at ' ],
+            [ 'checkScreenshot', { type: 'Symbol', symbols: ["checkScreenshot"] } ],
+            [ ' (' ],
             [
                 "../../../../Tests/BrowserTestsCore/ImageComparison/ImageComparer.ts:54:19",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "../../../../Tests/BrowserTestsCore/ImageComparison/ImageComparer.ts",
                     line: 54,
                     column: 19

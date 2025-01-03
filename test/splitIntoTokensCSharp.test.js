@@ -18,11 +18,23 @@ Kontur.FormsClassification.Exceptions.InvalidGFVException: Invalid GFV: 0. Ид�
 
         var matches = splitIntoTokens(trace);
         expect(matches[2]).toEqual([
-            ["   at Kontur.FormsClassification.Tools.IdHelperCore.CheckFormatId(Int32 id) in "],
+            ["   "], 
+            ["at "],
+            ["Kontur", { type: "Symbol", symbols: ["Kontur"] }], 
+            ["."], 
+            ["FormsClassification", { type: "Symbol", symbols: ["Kontur", "FormsClassification"] }], 
+            ["."], 
+            ["Tools", { type: "Symbol", symbols: ["Kontur", "FormsClassification", "Tools"] }], 
+            ["."], 
+            ["IdHelperCore", { type: "Symbol", symbols: ["Kontur", "FormsClassification", "Tools", "IdHelperCore"] }], 
+            ["."], 
+            ["CheckFormatId", { type: "Symbol", symbols: ["Kontur", "FormsClassification", "Tools", "IdHelperCore", "CheckFormatId"] }],
+            ["("], 
+            ["Int32 id) in "],
             [
                 "/builds/forms/forms/forms.classification/Classification.Core/Tools/IdHelperCore.cs:line 52",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "/builds/forms/forms/forms.classification/Classification.Core/Tools/IdHelperCore.cs",
                     line: 52,
                 },
@@ -47,11 +59,23 @@ Kontur.FormsClassification.Exceptions.InvalidGFVException: Invalid GFV: 0. Ид�
 
         var matches = splitIntoTokens(trace);
         expect(matches[2]).toEqual([
-            ["   at Kontur.FormsClassification.Tools.IdHelperCore.CheckFormatId(Int32 id) in "],
+            ["   "], 
+            ["at "],
+            ["Kontur", { type: "Symbol", symbols: ["Kontur"] }], 
+            ["."], 
+            ["FormsClassification", { type: "Symbol", symbols: ["Kontur", "FormsClassification"] }], 
+            ["."], 
+            ["Tools", { type: "Symbol", symbols: ["Kontur", "FormsClassification", "Tools"] }], 
+            ["."], 
+            ["IdHelperCore", { type: "Symbol", symbols: ["Kontur", "FormsClassification", "Tools", "IdHelperCore"] }], 
+            ["."], 
+            ["CheckFormatId", { type: "Symbol", symbols: ["Kontur", "FormsClassification", "Tools", "IdHelperCore", "CheckFormatId"] }],
+            ["("], 
+            ["Int32 id) in "],
             [
                 "\\/builds\\/forms\\/forms\\/forms.classification\\/Classification.Core\\/Tools\\/IdHelperCore.cs:line 52",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "/builds/forms/forms/forms.classification/Classification.Core/Tools/IdHelperCore.cs",
                     line: 52,
                 },
@@ -77,7 +101,7 @@ Kontur.FormsClassification.Exceptions.InvalidGFVException: Invalid GFV: 0. Ид�
                     column: 15,
                     filePath: "C:/path/to/file.js",
                     line: 10,
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                 },
             ],
             [")"],
@@ -153,7 +177,7 @@ DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadReque
             [
                 "C:\\BuildAgent\\work\\124ea67cdf592b6d\\_Src\\Services.Boxes\\Diadoc.PublicApi.Implementation.Boxes\\PublicApi\\Services\\Employees\\ApiEmployeesService.cs:88:4",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath:
                         "C:/BuildAgent/work/124ea67cdf592b6d/_Src/Services.Boxes/Diadoc.PublicApi.Implementation.Boxes/PublicApi/Services/Employees/ApiEmployeesService.cs",
                     line: 88,

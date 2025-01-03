@@ -1,5 +1,6 @@
 const vscode = require("vscode");
 const { splitIntoTokens, getPossibleFilePathsToSearch } = require("./stackTraceSplitter.js");
+const { levenshteinDistance } = require("./levenshteinDistance.js");
 
 let view;
 
@@ -11,13 +12,24 @@ function activate(context) {
             webviewView.webview.html = getHtmlForWebview();
             webviewView.webview.onDidReceiveMessage(async data => {
                 switch (data.type) {
-                    case "openFile": {
+                    case "OpenFile": {
                         const tokenMeta = data.tokenMeta;
                         const textDocument = await vscode.workspace.openTextDocument(tokenMeta.fileUriPath);
                         const editor = await vscode.window.showTextDocument(textDocument);
                         if (tokenMeta.line != undefined) {
                             const position = new vscode.Position(tokenMeta.line - 1, (tokenMeta.column ?? 1) - 1);
                             const newSelection = new vscode.Selection(position, position);
+                            editor.selection = newSelection;
+                            editor.revealRange(newSelection, vscode.TextEditorRevealType.InCenter);
+                        }
+                        break;
+                    }
+                    case "GoToSymbol": {
+                        const tokenMeta = data.tokenMeta;
+                        const textDocument = await vscode.workspace.openTextDocument(tokenMeta.location.uri.path);
+                        const editor = await vscode.window.showTextDocument(textDocument);
+                        if (tokenMeta.location.range[0] != undefined) {
+                            const newSelection = new vscode.Selection(tokenMeta.location.range[0], tokenMeta.location.range[1]);
                             editor.selection = newSelection;
                             editor.revealRange(newSelection, vscode.TextEditorRevealType.InCenter);
                         }
@@ -58,13 +70,34 @@ function activate(context) {
                             return await Promise.all(
                                 lineTokens.map(async ([line, meta]) => {
                                     if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
-                                    const { filePath, ...tokenMeta } = meta;
-                                    for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
-                                        const uris = await vscode.workspace.findFiles(possibleFilePath, null, 1, cancellationToken);
-                                        if (uris.length > 0) {
-                                            return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
+                                    if (meta.type === "FilePath") {
+                                        const { filePath, ...tokenMeta } = meta;
+                                        for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
+                                            const uris = await vscode.workspace.findFiles(possibleFilePath, null, 1, cancellationToken);
+                                            if (uris.length > 0) {
+                                                return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
+                                            }
+                                        }        
+                                    } else if (meta.type === "Symbol") {
+                                        const { symbols, ...tokenMeta } = meta;
+                                        const foundSymbols = await vscode.commands.executeCommand(
+                                            'vscode.executeWorkspaceSymbolProvider', symbols[symbols.length - 1]
+                                        );
+                                        if (foundSymbols.length > 0) {
+                                            const targetContainerName = symbols[symbols.length - 2] ?? "";
+                                            const targetName = symbols[symbols.length - 1];
+                                            const bestMatch = foundSymbols.reduce((prev, curr) => {
+                                                const prevDistance = levenshteinDistance(targetName, prev.name) + levenshteinDistance(targetContainerName, prev.containerName);
+                                                const currDistance = levenshteinDistance(targetName, curr.name) + levenshteinDistance(targetContainerName, curr.containerName);
+                                                return prevDistance < currDistance ? prev : curr;
+                                            });
+                                            return [line, { 
+                                                type: "Symbol", 
+                                                ...tokenMeta,  
+                                                foundSymbol: bestMatch,
+                                            }];    
                                         }
-                                    }    
+                                    }
                                     return [line];
                                 })
                             );    
@@ -105,6 +138,9 @@ function getHtmlForWebview() {
                     font-family: monospace;
                     white-space: pre-wrap;
                 }
+                .symbol {
+                    text-decoration: none;
+                }
             </style>
 		</head>
 		<body>
@@ -125,14 +161,25 @@ function getHtmlForWebview() {
                                     for (const token of lineTokens) {
                                         const tokenText = token[0]; 
                                         let tokenElement;
-                                        if (token[1] != undefined) {
+                                        if (token[1]?.type == "FilePath") {
                                             tokenElement = document.createElement('a');
                                             tokenElement.innerText = tokenText;
                                             tokenElement.href = "#";
                                             tokenElement.onclick = () => {
                                                 vscode.postMessage({
-                                                    type: 'openFile',
+                                                    type: 'OpenFile',
                                                     tokenMeta: token[1],
+                                                });
+                                            };
+                                        } else if (token[1]?.type == "Symbol" && token[1]?.foundSymbol) {
+                                            tokenElement = document.createElement('a');
+                                            tokenElement.classList.add('symbol');
+                                            tokenElement.innerText = tokenText;
+                                            tokenElement.href = "#";
+                                            tokenElement.onclick = () => {
+                                                vscode.postMessage({
+                                                    type: 'GoToSymbol',
+                                                    tokenMeta: token[1].foundSymbol,
                                                 });
                                             };
                                         } else {
