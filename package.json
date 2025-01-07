@@ -56,7 +56,8 @@
 			{
 				"command": "stack-trace-analyzer.clearAnalyizedStackTraces",
 				"category": "Stack Trace Analyzer",
-				"title": "Clear analyzed stack traces"
+				"title": "Clear analyzed stack traces",
+				"icon": "$(clear-all)"
 			}
 		],
 		"menus": {
