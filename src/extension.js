@@ -97,7 +97,7 @@ function getHtmlForWebview() {
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>Cat Colors</title>
             <style nonce="${nonce}">
@@ -111,6 +111,39 @@ function getHtmlForWebview() {
             <div id="current-stack-trace">Call 'Analyze stack trace from clipboard' to see the stack trace</div>
 			<script nonce="${nonce}">
 				const vscode = acquireVsCodeApi();
+                const prevLines = (vscode.getState() || { lines: null }).lines;
+
+                function showLines(lines) {
+                    const element = document.querySelector('#current-stack-trace');
+                    element.innerText = "";
+                    for (const lineTokens of lines) {
+                        const lineElement = document.createElement('div');
+                        for (const token of lineTokens) {
+                            const tokenText = token[0]; 
+                            let tokenElement;
+                            if (token[1] != undefined) {
+                                tokenElement = document.createElement('a');
+                                tokenElement.innerText = tokenText;
+                                tokenElement.href = "#";
+                                tokenElement.onclick = () => {
+                                    vscode.postMessage({
+                                        type: 'OpenFile',
+                                        tokenMeta: token[1],
+                                    });
+                                };
+                            } else {
+                                tokenElement = document.createElement('span');
+                                tokenElement.innerText = tokenText;
+                            }
+                            lineElement.appendChild(tokenElement);
+                        }
+                        element.appendChild(lineElement);
+                    }
+                }
+        
+                if (prevLines) {
+                    showLines(prevLines);
+                }
 
 				window.addEventListener('message', async event => {
 					const message = event.data;
@@ -118,37 +151,14 @@ function getHtmlForWebview() {
 						case 'setStacktracePreview':
 						case 'addAnalyzedStackTrace':
 							{
-                                const element = document.querySelector('#current-stack-trace');
-                                element.innerText = "";
-                                for (const lineTokens of message.lines) {
-                                    const lineElement = document.createElement('div');
-                                    for (const token of lineTokens) {
-                                        const tokenText = token[0]; 
-                                        let tokenElement;
-                                        if (token[1] != undefined) {
-                                            tokenElement = document.createElement('a');
-                                            tokenElement.innerText = tokenText;
-                                            tokenElement.href = "#";
-                                            tokenElement.onclick = () => {
-                                                vscode.postMessage({
-                                                    type: 'OpenFile',
-                                                    tokenMeta: token[1],
-                                                });
-                                            };
-                                        } else {
-                                            tokenElement = document.createElement('span');
-                                            tokenElement.innerText = tokenText;
-                                        }
-                                        lineElement.appendChild(tokenElement);
-                                    }
-                                    element.appendChild(lineElement);
-                                }
-
+                                showLines(message.lines);
+                                vscode.setState({ lines: message.lines });
 								break;
 							}
 						case 'clearAnalyizedStackTraces':
 							{
 								document.querySelector('#current-stack-trace').innerText = "Call 'Analyze stack trace from clipboard' to see the stack trace";
+                                vscode.setState({ lines: null });
 								break;
 							}
 					}
