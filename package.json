@@ -58,13 +58,37 @@
 				"category": "Stack Trace Analyzer",
 				"title": "Clear analyzed stack traces",
 				"icon": "$(clear-all)"
+			},
+			{
+				"command": "stack-trace-analyzer.selectNextStackTrace",
+				"category": "Stack Trace Analyzer",
+				"title": "Next stack trace",
+				"icon": "$(chevron-right)",
+				"enablement": "stack-trace-analyzer.canSelectNextStackTrace"
+			},
+			{
+				"command": "stack-trace-analyzer.selectPrevStackTrace",
+				"category": "Stack Trace Analyzer",
+				"title": "Previous stack trace",
+				"icon": "$(chevron-left)",
+				"enablement": "stack-trace-analyzer.canSelectPrevStackTrace"
 			}
 		],
 		"menus": {
 			"view/title": [
 				{
+					"command": "stack-trace-analyzer.selectPrevStackTrace",
+					"group": "navigation@1",
+					"when": "view == stack-trace-analyzer.root"
+				},
+				{
+					"command": "stack-trace-analyzer.selectNextStackTrace",
+					"group": "navigation@2",
+					"when": "view == stack-trace-analyzer.root"
+				},
+				{
 					"command": "stack-trace-analyzer.clearAnalyizedStackTraces",
-					"group": "navigation",
+					"group": "navigation@10",
 					"when": "view == stack-trace-analyzer.root"
 				}
 			]
