@@ -11,7 +11,7 @@ function activate(context) {
             webviewView.webview.html = getHtmlForWebview();
             webviewView.webview.onDidReceiveMessage(async data => {
                 switch (data.type) {
-                    case "openFile": {
+                    case "OpenFile": {
                         const tokenMeta = data.tokenMeta;
                         const textDocument = await vscode.workspace.openTextDocument(tokenMeta.fileUriPath);
                         const editor = await vscode.window.showTextDocument(textDocument);
@@ -131,7 +131,7 @@ function getHtmlForWebview() {
                                             tokenElement.href = "#";
                                             tokenElement.onclick = () => {
                                                 vscode.postMessage({
-                                                    type: 'openFile',
+                                                    type: 'OpenFile',
                                                     tokenMeta: token[1],
                                                 });
                                             };
