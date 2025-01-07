@@ -1,6 +1,6 @@
 const tokenizers = [
     [
-        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\\\/\s\(\):]+\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
+        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
         m => {
             const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
             if (m[9]) {
