@@ -12,10 +12,7 @@
 		"type": "git",
 		"url": "https://github.com/tihonove/vscode-stack-trace-analyzer.git"
 	},
-	"extensionKind": [
-		"ui",
-		"workspace"
-	],
+	"extensionKind": ["workspace"],
 	"categories": [
 		"Programming Languages"
 	],
