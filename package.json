@@ -3,7 +3,7 @@
 	"displayName": "Stack trace analyzer",
 	"description": "Easy way to analyze stack traces from any language and sources",
 	"publisher": "tihonove",
-	"version": "1.3.1",
+	"version": "1.4.0",
 	"license": "MIT",
 	"engines": {
 		"vscode": "^1.74.0"
