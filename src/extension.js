@@ -70,6 +70,11 @@ function activate(context) {
                         }
                         break;
                     }
+                    case "GoToSymbol": {
+                        const tokenMeta = data.tokenMeta;
+                        vscode.commands.executeCommand("workbench.action.quickOpen", "#" + tokenMeta.symbols.join("."));
+                        break;
+                    }
                 }
             });
         },
@@ -102,7 +107,7 @@ function activate(context) {
                 updateCurrentStackTraceIndex(_ => 0);
                 return;
             }
-            
+
             const stackTraceInfo = { source: clipboardContent };
             stackTraceInfos.push(stackTraceInfo);
 
@@ -118,11 +123,11 @@ function activate(context) {
                 },
                 async (_, cancellationToken) => {
                     stackTraceInfo.lines = splitIntoTokens(clipboardContent);
-                    showStackTraceTokensInWebView(stackTraceInfo.lines.map(x => x.map(t => [t[0]])))
+                    showStackTraceTokensInWebView(stackTraceInfo.lines.map(x => x.map(t => [t[0]])));
                     stackTraceInfo.lines = await echrichWorkspacePathsInToken(stackTraceInfo.lines, cancellationToken);
-                    storeStackTracesToWorkspaceState(context);                    
+                    storeStackTracesToWorkspaceState(context);
                     if (getCurrentStackTraceInfo() == stackTraceInfo) {
-                        showStackTraceTokensInWebView(stackTraceInfo.lines)
+                        showStackTraceTokensInWebView(stackTraceInfo.lines);
                     }
                     if (view == undefined) {
                         vscode.window.showInformationMessage("Extension is still initializing, please wait...");
@@ -146,21 +151,20 @@ function activate(context) {
 
 async function echrichWorkspacePathsInToken(lines, cancellationToken) {
     return await Promise.all(
-        lines.map(async (lineTokens) => {
+        lines.map(async lineTokens => {
             return await Promise.all(
                 lineTokens.map(async ([line, meta]) => {
                     if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
-                    const { filePath, ...tokenMeta } = meta;
-                    for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
-                        const uris = await vscode.workspace.findFiles(
-                            possibleFilePath,
-                            null,
-                            1,
-                            cancellationToken
-                        );
-                        if (uris.length > 0) {
-                            return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
+                    if (meta.type === "FilePath") {
+                        const { filePath, ...tokenMeta } = meta;
+                        for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
+                            const uris = await vscode.workspace.findFiles(possibleFilePath, null, 1, cancellationToken);
+                            if (uris.length > 0) {
+                                return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
+                            }
                         }
+                    } else if (meta.type === "Symbol") {
+                        return [line, { type: "Symbol", ...meta }];
                     }
                     return [line];
                 })
@@ -186,6 +190,14 @@ function getHtmlForWebview() {
                     font-family: monospace;
                     white-space: pre-wrap;
                 }
+                .symbol {
+                    color: inherit;
+                    text-decoration: none;
+                }
+                .symbol:hover {
+                    color: inherit;
+                    text-decoration: underline;
+                }
             </style>
 		</head>
 		<body>
@@ -202,7 +214,7 @@ function getHtmlForWebview() {
                         for (const token of lineTokens) {
                             const tokenText = token[0]; 
                             let tokenElement;
-                            if (token[1] != undefined) {
+                            if (token[1]?.type == "FilePath") {
                                 tokenElement = document.createElement('a');
                                 tokenElement.innerText = tokenText;
                                 tokenElement.href = "#";
@@ -210,6 +222,19 @@ function getHtmlForWebview() {
                                     vscode.postMessage({
                                         type: 'OpenFile',
                                         tokenMeta: token[1],
+                                    });
+                                };
+                            } else if (token[1]?.type == "Symbol") {
+                                tokenElement = document.createElement('a');
+                                tokenElement.classList.add('symbol');
+                                tokenElement.innerText = tokenText;
+                                tokenElement.href = "#";
+                                tokenElement.onclick = (event) => {
+                                    vscode.postMessage({
+                                        type: 'GoToSymbol',
+                                        tokenMeta: event.shiftKey 
+                                            ? { ...token[1], symbols: token[1].symbols.slice(-1) } 
+                                            : token[1],
                                     });
                                 };
                             } else {

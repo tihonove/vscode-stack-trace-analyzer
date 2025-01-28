@@ -2,7 +2,7 @@ const tokenizers = [
     [
         /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
         m => {
-            const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
+            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
             if (m[9]) {
                 result.column = Number(m[9]);
             }
@@ -12,7 +12,7 @@ const tokenizers = [
     [
         /(?:at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
         m => {
-            const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
+            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
             if (m[9]) {
                 result.column = Number(m[9]);
             }
@@ -22,8 +22,8 @@ const tokenizers = [
     [
         /webpack\:\[(.*?)\]\(.*?\)\?:(\d+)(?:\:(\d+))/gi,
         m => {
-            console.log(m)
-            const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
+            console.log(m);
+            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
             if (m[3]) {
                 result.column = Number(m[3]);
             }
@@ -32,9 +32,35 @@ const tokenizers = [
     ],
     [
         /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi,
-        m => ({ type: "FullFilePath", filePath: normalizeFilePath(m[0]) }),
+        m => ({ type: "FilePath", filePath: normalizeFilePath(m[0]) }),
+    ],
+    [
+        /(at\s+)([\dа-яеёα-ωΑ-Ωא-תء-يๅ-๏ก-๛\w\.\: ]+?)(\s*\()/gi,
+        m => [
+            [m[1]],
+            ...intersperse(
+                m[2]
+                    .split(".")
+                    .reduce(
+                        (result, symbol) => [
+                            ...result,
+                            [
+                                symbol,
+                                { type: "Symbol", symbols: [...(result.slice(-1)[0]?.[1]?.symbols ?? []), symbol] },
+                            ],
+                        ],
+                        []
+                    ),
+                ["."]
+            ),
+            [m[3]],
+        ],
     ],
 ];
+
+function intersperse(arr, separator) {
+    return arr.length === 0 ? [] : arr.slice(1).reduce((r, item) => [...r, separator, item], [arr[0]]);
+}
 
 const normalizeFilePath = filePath => filePath.replace(/[\/\\]+/g, "/");
 
@@ -47,7 +73,9 @@ function splitByRegex(input, regex, tokenFactory) {
         if (match.index > lastIndex) {
             result.push([input.slice(lastIndex, match.index)]);
         }
-        result.push([match[0], tokenFactory(match)]);
+        const tokenMeta = tokenFactory(match);
+        if (Array.isArray(tokenMeta)) result.push(...tokenMeta);
+        else result.push([match[0], tokenFactory(match)]);
         lastIndex = regex.lastIndex;
     }
     if (lastIndex < input.length) {
@@ -70,7 +98,7 @@ exports.splitIntoTokens = function splitIntoTokens(trace) {
     const lines = trace.split("\n");
 
     for (const preline of lines) {
-        const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/ig);
+        const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/gi);
         if (preline.length / (escapedNewLineCount - 1) > 100 || (preline.length / 240 && escapedNewLineCount > 5)) {
             lineOfLines = preline.replace(/\\n/gi, "\n").split("\n");
         } else {

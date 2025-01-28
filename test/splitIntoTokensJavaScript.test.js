@@ -16,12 +16,17 @@ See diff for details: C:\\BuildAgent\\work\\forms-root-all\\diadoc.forms\\candy.
         `;
 
         var matches = splitIntoTokens(trace);
+        console.log(matches[5]);
+
         expect(matches[5]).toEqual([
-            ["    at checkScreenshot ("],
+            ["    "],
+            ["at "],
+            ["checkScreenshot", { type: "Symbol", symbols: ["checkScreenshot"] }],
+            [" ("],
             [
                 "../../../../Tests/BrowserTestsCore/ImageComparison/ImageComparer.ts:54:19",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "../../../../Tests/BrowserTestsCore/ImageComparison/ImageComparer.ts",
                     line: 54,
                     column: 19,
@@ -43,11 +48,27 @@ at processTicksAndRejections (node:internal/process/task_queues:95:5)        `;
 
         var matches = splitIntoTokens(trace);
         expect(matches[5]).toEqual([
-            ["at Блокгрузпринял3Сотрудникинойуполномоченнойорганизации_7001201.Фамилия формат ("],
+            ["at "],
+            [
+                "Блокгрузпринял3Сотрудникинойуполномоченнойорганизации_7001201",
+                {
+                    symbols: ["Блокгрузпринял3Сотрудникинойуполномоченнойорганизации_7001201"],
+                    type: "Symbol",
+                },
+            ],
+            ["."],
+            [
+                "Фамилия формат",
+                {
+                    symbols: ["Блокгрузпринял3Сотрудникинойуполномоченнойорганизации_7001201", "Фамилия формат"],
+                    type: "Symbol",
+                },
+            ],
+            [" ("],
             [
                 "forms\\70\\012\\7001201\\Candy\\test\\ui\\/Блок груз принял. 3. Сотрудник иной уполномоченной организации.test.ts:188:86",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath:
                         "forms/70/012/7001201/Candy/test/ui/Блок груз принял. 3. Сотрудник иной уполномоченной организации.test.ts",
                     line: 188,
@@ -95,12 +116,30 @@ at processTicksAndRejections (node:internal/process/task_queues:95:5)        `;
     at u (asyncToGenerator.js:25:9)`;
 
         var matches = splitIntoTokens(trace);
+        console.log(JSON.stringify(matches[2], null, 2));
         expect(matches[2]).toEqual([
-            ["    at e.value ("],
+            ["    "],
+            ["at "],
+            [
+                "e",
+                {
+                    type: "Symbol",
+                    symbols: ["e"],
+                },
+            ],
+            ["."],
+            [
+                "value",
+                {
+                    type: "Symbol",
+                    symbols: ["e", "value"],
+                },
+            ],
+            [" ("],
             [
                 "ModelNormalizer.ts:125:18",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "ModelNormalizer.ts",
                     line: 125,
                     column: 18,
@@ -125,11 +164,20 @@ at processTicksAndRejections (node:internal/process/task_queues:95:5)        `;
 
         var matches = splitIntoTokens(trace);
         expect(matches[1]).toEqual([
-            ["    at findPathToProjectById ("],
+            ["    "],
+            ["at "],
+            [
+                "findPathToProjectById",
+                {
+                    type: "Symbol",
+                    symbols: ["findPathToProjectById"],
+                },
+            ],
+            [" ("],
             [
                 "webpack:[//test-analytics-front/./src/Domain/Storage.ts](vscode-webview://1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=32710623-caee-489a-98d8-867e11dab69a&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&purpose=webviewView#)?:68:9",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "/test-analytics-front/./src/Domain/Storage.ts",
                     line: 68,
                     column: 9,
@@ -147,12 +195,33 @@ AssertionError: expected 1 to equal +0
 ------- Stdout: -------`;
 
         var matches = splitIntoTokens(trace);
+        console.log(JSON.stringify(matches[2], null, 2));
         expect(matches[2]).toEqual([
-            ["    at Блокгрузпринял4Уполномоченноефизическоелицо_7001201.Основания полномочий сотрудника формат ("],
+            ["    "],
+            ["at "],
+            [
+                "Блокгрузпринял4Уполномоченноефизическоелицо_7001201",
+                {
+                    type: "Symbol",
+                    symbols: ["Блокгрузпринял4Уполномоченноефизическоелицо_7001201"],
+                },
+            ],
+            ["."],
+            [
+                "Основания полномочий сотрудника формат",
+                {
+                    type: "Symbol",
+                    symbols: [
+                        "Блокгрузпринял4Уполномоченноефизическоелицо_7001201",
+                        "Основания полномочий сотрудника формат",
+                    ],
+                },
+            ],
+            [" ("],
             [
                 "forms\\7001201\\test\\ui\\/Блок груз принял. 4. Уполномоченное физическое лицо.test.ts:144:86",
                 {
-                    type: "FullFilePathWithLine",
+                    type: "FilePath",
                     filePath: "forms/7001201/test/ui/Блок груз принял. 4. Уполномоченное физическое лицо.test.ts",
                     line: 144,
                     column: 86,
