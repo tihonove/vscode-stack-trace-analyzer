@@ -10,6 +10,27 @@ const tokenizers = [
         },
     ],
     [
+        /(?:at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
+        m => {
+            const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
+            if (m[9]) {
+                result.column = Number(m[9]);
+            }
+            return result;
+        },
+    ],
+    [
+        /webpack\:\[(.*?)\]\(.*?\)\?:(\d+)(?:\:(\d+))/gi,
+        m => {
+            console.log(m)
+            const result = { type: "FullFilePathWithLine", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
+            if (m[3]) {
+                result.column = Number(m[3]);
+            }
+            return result;
+        },
+    ],
+    [
         /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi,
         m => ({ type: "FullFilePath", filePath: normalizeFilePath(m[0]) }),
     ],
