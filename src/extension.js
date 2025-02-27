@@ -72,7 +72,10 @@ function activate(context) {
                     }
                     case "GoToSymbol": {
                         const tokenMeta = data.tokenMeta;
-                        vscode.commands.executeCommand("workbench.action.quickOpen", "#" + tokenMeta.symbols.join("."));
+                        vscode.commands.executeCommand(
+                            "workbench.action.quickOpen",
+                            "#" + tokenMeta.symbols.reverse().slice(0, 2).join(" ")
+                        );
                         break;
                     }
                 }
@@ -158,9 +161,24 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken) {
                     if (meta.type === "FilePath") {
                         const { filePath, ...tokenMeta } = meta;
                         for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
-                            const uris = await vscode.workspace.findFiles(possibleFilePath, null, 1, cancellationToken);
-                            if (uris.length > 0) {
-                                return [line, { fileUriPath: uris[0].path, ...tokenMeta }];
+                            const uris1 = await vscode.workspace.findFiles(
+                                possibleFilePath,
+                                null,
+                                1,
+                                cancellationToken
+                            );
+                            if (uris1.length > 0) {
+                                return [line, { fileUriPath: uris1[0].path, ...tokenMeta }];
+                            } else {
+                                const uris2 = await vscode.workspace.findFiles(
+                                    "**/*/" + possibleFilePath,
+                                    "**/node_modules/**",
+                                    1,
+                                    cancellationToken
+                                );
+                                if (uris2.length > 0) {
+                                    return [line, { fileUriPath: uris2[0].path, ...tokenMeta }];
+                                }
                             }
                         }
                     } else if (meta.type === "Symbol") {

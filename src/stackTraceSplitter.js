@@ -10,19 +10,22 @@ const tokenizers = [
         },
     ],
     [
-        /(?:at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
+        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(:(line )?(\d+)(\:(\d+))?)/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
-            if (m[9]) {
-                result.column = Number(m[9]);
+            const result = { type: "FilePath", filePath: normalizeFilePath(m[2]), line: Number(m[8]) };
+            if (m[10]) {
+                result.column = Number(m[10]);
             }
-            return result;
+            const resultList = [[m[2] + (m[6] ?? ""), result]]
+            if (m[1]) {
+                resultList.unshift([m[1]])
+            }
+            return resultList;
         },
     ],
     [
         /webpack\:\[(.*?)\]\(.*?\)\?:(\d+)(?:\:(\d+))/gi,
         m => {
-            console.log(m);
             const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
             if (m[3]) {
                 result.column = Number(m[3]);

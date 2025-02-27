@@ -16,7 +16,6 @@ See diff for details: C:\\BuildAgent\\work\\forms-root-all\\diadoc.forms\\candy.
         `;
 
         var matches = splitIntoTokens(trace);
-        console.log(matches[5]);
 
         expect(matches[5]).toEqual([
             ["    "],
@@ -116,7 +115,6 @@ at processTicksAndRejections (node:internal/process/task_queues:95:5)        `;
     at u (asyncToGenerator.js:25:9)`;
 
         var matches = splitIntoTokens(trace);
-        console.log(JSON.stringify(matches[2], null, 2));
         expect(matches[2]).toEqual([
             ["    "],
             ["at "],
@@ -195,7 +193,6 @@ AssertionError: expected 1 to equal +0
 ------- Stdout: -------`;
 
         var matches = splitIntoTokens(trace);
-        console.log(JSON.stringify(matches[2], null, 2));
         expect(matches[2]).toEqual([
             ["    "],
             ["at "],
@@ -228,6 +225,113 @@ AssertionError: expected 1 to equal +0
                 },
             ],
             [")"],
+        ]);
+    });
+
+    test("Stack trace - 6", () => {
+        const trace = `VM21249:1 Uncaught (in promise) SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input
+    at ServiceRunnerClient._callee3$ (ServiceRunnerClient.ts:113:31)
+    at [tryCatch](vscode-webview://1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&remoteAuthority=ssh-remote%2Bvm-rmtdev-04#) (ServiceRunnerClient.ts:7:1062)
+    at [Generator](vscode-webview://1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&remoteAuthority=ssh-remote%2Bvm-rmtdev-04#).[eval](vscode-webview://1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&remoteAuthority=ssh-remote%2Bvm-rmtdev-04#) (ServiceRunnerClient.ts:7:3008)
+    at Generator.eval [as next] (ServiceRunnerClient.ts:7:1699)
+    at [asyncGeneratorStep](vscode-webview://1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&remoteAuthority=ssh-remote%2Bvm-rmtdev-04#) (ServiceRunnerClient.ts:8:70)
+    at [_next](vscode-webview://1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net&parentOrigin=vscode-file%3A%2F%2Fvscode-app&remoteAuthority=ssh-remote%2Bvm-rmtdev-04#) (ServiceRunnerClient.ts:9:163)`;
+
+        var matches = splitIntoTokens(trace);
+        expect(matches[2]).toEqual([
+            ["    at [tryCatch](vscode-webview:"],
+            [
+                "//1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net",
+                {
+                    type: "FilePath",
+                    filePath:
+                        "/1km1s56ci0alb2k3843rp088kufsg2c07oivp2d0j6bphfqg916c/index.html?id=593a67a8-748c-42fb-b3da-244cc0ac8c19&origin=0a6fc315-4f75-40fa-9f9f-a95af764cbc6&swVersion=4&extensionId=tihonove.stack-trace-analyzer&platform=electron&vscode-resource-base-authority=vscode-resource.vscode-cdn.net",
+                },
+            ],
+            ["&parentOrigin=vscode-file%3A%2F%2Fvscode-app&remoteAuthority=ssh-remote%2Bvm-rmtdev-04#) ("],
+            [
+                "ServiceRunnerClient.ts:7:1062",
+                {
+                    type: "FilePath",
+                    filePath: "ServiceRunnerClient.ts",
+                    line: 7,
+                    column: 1062,
+                },
+            ],
+            [")"],
+        ]);
+    });
+
+    test("Stack trace - 7", () => {
+        const trace = `big.mjs:139 Uncaught (in promise) Error: [big.js] Invalid number
+    at calculationFunctions.js:83:59
+    at Object.resultHandler (AutocalcCommonFunctions.ts:58:24)
+    at Calculator.executeHookFunctions (Calculator.ts:242:53)
+    at Calculator.calculateHook (Calculator.ts:212:18)
+    at Calculator.calculate (Calculator.ts:115:22)
+    at ChangesProcessor.processCalculationsAsync (ChangesProcessor.ts:427:37)
+    at ChangesProcessor.processEventsAfterUpdate (ChangesProcessor.ts:263:18)
+    at Form.processEventsAfterUpdate (Form.ts:1168:32)
+    at Form.performModelUpdate (Form.ts:1137:18)
+    at Form.setViewModelField (Form.ts:547:18)
+    at AllActionCreators.ts:75:14
+    at crossFitTableMiddleware.ts:35:28
+    at _callee2$ (InputContainer.tsx:80:13)
+    at tryCatch (InputContainer.tsx:2:1)
+    at Generator.<anonymous> (InputContainer.tsx:2:1)
+    at Generator.next (InputContainer.tsx:2:1)
+    at asyncGeneratorStep (InputContainer.tsx:2:1)
+    at _next (InputContainer.tsx:2:1)
+    at InputContainer.tsx:2:1
+    at new Promise (<anonymous>)
+    at InputContainer.tsx:2:1
+    at onChangeWithHelper (InputContainer.tsx:84:10)
+    at InputHelpers.ts:82:17
+    at Object.handleChange [as onValueChange] (Input.tsx:174:17)
+    at CurrencyInput.<anonymous> (CurrencyInput.tsx:347:32)`;
+
+        var matches = splitIntoTokens(trace);
+        expect(matches[2]).toEqual([
+            ["    "],
+            ["at "],
+            [
+                "Object",
+                {
+                    type: "Symbol",
+                    symbols: ["Object"],
+                },
+            ],
+            ["."],
+            [
+                "resultHandler",
+                {
+                    type: "Symbol",
+                    symbols: ["Object", "resultHandler"],
+                },
+            ],
+            [" ("],
+            [
+                "AutocalcCommonFunctions.ts:58:24",
+                {
+                    type: "FilePath",
+                    filePath: "AutocalcCommonFunctions.ts",
+                    line: 58,
+                    column: 24,
+                },
+            ],
+            [")"],
+        ]);
+        expect(matches[11]).toEqual([
+            ["    at "],
+            [
+                "AllActionCreators.ts:75:14",
+                {
+                    type: "FilePath",
+                    filePath: "AllActionCreators.ts",
+                    line: 75,
+                    column: 14,
+                },
+            ],
         ]);
     });
 });
