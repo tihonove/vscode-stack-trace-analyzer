@@ -1,20 +1,20 @@
 const tokenizers = [
     [
-        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(\??:(line )?(\d+)(\:(\d+))?)/gi,
+        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[7]) };
-            if (m[9]) {
-                result.column = Number(m[9]);
+            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m.groups.line1 ?? m.groups.line2) };
+            if (m.groups.col1 || m.groups.col2) {
+                result.column = Number(m.groups.col1 || m.groups.col2);
             }
             return result;
         },
     ],
     [
-        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))(\??:(line )?(\d+)(\:(\d+))?)/gi,
+        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[2]), line: Number(m[8]) };
-            if (m[10]) {
-                result.column = Number(m[10]);
+            const result = { type: "FilePath", filePath: normalizeFilePath(m[2]), line: Number(m.groups.line1 ?? m.groups.line2) };
+            if (m.groups.col1 || m.groups.col2) {
+                result.column = Number(m.groups.col1 || m.groups.col2);
             }
             const resultList = [[m[2] + (m[6] ?? ""), result]]
             if (m[1]) {

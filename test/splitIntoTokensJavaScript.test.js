@@ -377,6 +377,25 @@ AssertionError: expected 1 to equal +0
             [")"],
         ]);
     });
-    
-    
+
+    test("Stack trace - 9", () => {
+        const trace = `src/Domain/Storage.ts(50,25): error TS18048: 'groupNode.projects' is possibly 'undefined'.
+src/Domain/Storage.ts(57,29): error TS18048: 'groupNode.groups' is possibly 'undefined'.
+src/Pages/MergeRequestJobsPage.tsx(57,22): error TS2741: Property 'indentLevel' is missing in type '{ rootProjectStructure: GroupNode; allJobs: [string, string][]; allJobRuns: JobsQueryRow[]; currentBranchName: string; }' but required in type 'JobsViewProps'.`;
+
+        var matches = splitIntoTokens(trace);
+        console.log(JSON.stringify(matches[1], null, 4));
+        expect(matches[1]).toEqual([
+            [
+                "src/Domain/Storage.ts(57,29)",
+                {
+                    type: "FilePath",
+                    filePath: "src/Domain/Storage.ts",
+                    line: 57,
+                    column: 29,
+                },
+            ],
+            [": error TS18048: 'groupNode.groups' is possibly 'undefined'."],
+        ]);
+    });
 });
