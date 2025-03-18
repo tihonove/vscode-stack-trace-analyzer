@@ -334,4 +334,49 @@ AssertionError: expected 1 to equal +0
             ],
         ]);
     });
+
+    test("Stack trace - 8", () => {
+        const trace = `at O (webpack://test-analytics-front/./node_modules/styled-components/dist/styled-components.browser.esm.js?:32:23554)
+    at PipelineRunTestListPage (webpack://test-analytics-front/./src/Pages/PipelineRunTestListPage.tsx?:39:126)
+    at RenderedRoute (webpack://test-analytics-front/./node_modules/react-router/dist/index.js?:579:5)
+    at RenderedRoute (webpack://test-analytics-front/./node_modules/react-router/dist/index.js?:579:5)
+    at RenderedRoute (webpack://test-analytics-front/./node_modules/react-router/dist/index.js?:579:5)
+    at Routes (webpack://test-analytics-front/./node_modules/react-router/dist/index.js?:1313:5)
+    at div
+    at O (webpack://test-analytics-front/./node_modules/styled-components/dist/styled-components.browser.esm.js?:32:23554)
+    at App (webpack://test-analytics-front/./src/App.tsx?:43:121)
+    at Suspense
+    at Router (webpack://test-analytics-front/./node_modules/react-router/dist/index.js?:1247:15)
+    at BrowserRouter (webpack://test-analytics-front/./node_modules/react-router-dom/dist/index.js?:704:5)
+    at ot (webpack://test-analytics-front/./node_modules/styled-components/dist/styled-components.browser.esm.js?:32:20343)
+    at TestAnalyticsThemeProvider (webpack://test-analytics-front/./src/Theme/TestAnalyticsThemeProvider.tsx?:19:114)        
+        `;
+
+        var matches = splitIntoTokens(trace);
+        expect(matches[0]).toEqual([
+            ["at "],
+            [
+                "O",
+                {
+                    type: "Symbol",
+                    symbols: ["O"],
+                },
+            ],
+            [" ("],
+            ["webpack:"],
+            [
+                "//test-analytics-front/./node_modules/styled-components/dist/styled-components.browser.esm.js?:32:23554",
+                {
+                    type: "FilePath",
+                    filePath:
+                        "/test-analytics-front/./node_modules/styled-components/dist/styled-components.browser.esm.js",
+                    line: 32,
+                    column: 23554,
+                },
+            ],
+            [")"],
+        ]);
+    });
+    
+    
 });
