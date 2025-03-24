@@ -91,13 +91,7 @@
 					"when": "view == stack-trace-analyzer.root"
 				}
 			]
-		},
-		"keybindings": [
-			{
-				"command": "stack-trace-analyzer.analyzeStackTraceFromClipboard",
-				"key": "ctrl+shift+e"
-			}
-		]
+		}
 	},
 	"scripts": {
 		"test": "jest"
