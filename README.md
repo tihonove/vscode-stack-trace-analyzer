@@ -11,14 +11,14 @@ Stack trace analyzer - Easy way to analyze stack traces from any language and so
 
 ## Commands
 
-- `Analyze stack from clipboard` (Default shortcut: `Ctrl+Shift+E`)
+- `Analyze stack from clipboard`
 
 ![Commands](docs/Commands.png)
 
 ## Usage
 
 1. Copy a stack trace to your clipboard.
-2. Run the `Analyze stack from clipboard` command (or use the shortcut `Ctrl+Shift+E`).
+2. Run the `Analyze stack from clipboard` command.
 3. The stack trace will be analyzed and displayed in the panel with clickable file paths and line numbers.
 
 ![Result](docs/StackTracePanel.png)
