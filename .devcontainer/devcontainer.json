@@ -1,0 +1,15 @@
+{
+	"name": "Stack Trace Analyzer Development",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "22"
+		},
+		"ghcr.io/devcontainers-community/npm-features/prettier:1": {}
+	},
+	"postCreateCommand": "npm install -g @vscode/vsce && npm install && echo 'Development environment ready!'",
+	"remoteUser": "vscode",
+	"mounts": [
+		"source=${localWorkspaceFolder}/.git,target=/workspaces/${localWorkspaceFolderBasename}/.git,type=bind,consistency=cached"
+	]
+}
