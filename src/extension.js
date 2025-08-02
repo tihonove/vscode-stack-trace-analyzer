@@ -34,6 +34,11 @@ function showStackTraceTokensInWebView(lines) {
     view.webview.postMessage({ type: "setStackTraceTokens", lines: lines });
 }
 
+function setLoadingState(isLoading, progress = 0) {
+    if (view == undefined) return;
+    view.webview.postMessage({ type: "setLoadingState", isLoading: isLoading, progress: progress });
+}
+
 function getCurrentStackTraceInfo() {
     return stackTraceInfos[stackTraceInfos.length - 1 - currentStackTraceFromLast];
 }
@@ -125,16 +130,30 @@ function activate(context) {
                     cancellable: true,
                 },
                 async (_, cancellationToken) => {
-                    stackTraceInfo.lines = splitIntoTokens(clipboardContent);
+                    setLoadingState(true, 0);
+                  
+                    stackTraceInfo.lines = splitIntoTokens(clipboardContent, (progress) => {
+                        setLoadingState(true, Math.round(progress * 10));
+                    });
                     showStackTraceTokensInWebView(stackTraceInfo.lines.map(x => x.map(t => [t[0]])));
-                    stackTraceInfo.lines = await echrichWorkspacePathsInToken(stackTraceInfo.lines, cancellationToken);
+                    
+                    stackTraceInfo.lines = await echrichWorkspacePathsInToken(
+                        stackTraceInfo.lines, 
+                        cancellationToken,
+                        (progress) => setLoadingState(true, Math.round(10 + progress * 90))
+                    );
                     storeStackTracesToWorkspaceState(context);
+                                        
                     if (getCurrentStackTraceInfo() == stackTraceInfo) {
                         showStackTraceTokensInWebView(stackTraceInfo.lines);
                     }
                     if (view == undefined) {
                         vscode.window.showInformationMessage("Extension is still initializing, please wait...");
                     }
+                    
+                    setLoadingState(true, 100);
+                    await delay(300);
+                    setLoadingState(false, 0);
                 }
             );
         })
@@ -152,7 +171,18 @@ function activate(context) {
     );
 }
 
-async function echrichWorkspacePathsInToken(lines, cancellationToken) {
+async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress) {
+    let totalFilePathTokens = 0;
+    for (const lineTokens of lines) {
+        for (const [_, meta] of lineTokens) {
+            if (meta && meta.type === "FilePath") {
+                totalFilePathTokens += 1;
+            }
+        }
+    }
+
+    let processedPaths = 0;
+
     return await Promise.all(
         lines.map(async lineTokens => {
             return await Promise.all(
@@ -160,7 +190,7 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken) {
                     if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
                     if (meta.type === "FilePath") {
                         const { filePath, ...tokenMeta } = meta;
-                        for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
+                        for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {                            
                             const uris1 = await vscode.workspace.findFiles(
                                 possibleFilePath,
                                 null,
@@ -168,6 +198,10 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken) {
                                 cancellationToken
                             );
                             if (uris1.length > 0) {
+                                processedPaths += 1;
+                                if (onProgress) {
+                                    onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
+                                }
                                 return [line, { fileUriPath: uris1[0].path, ...tokenMeta }];
                             } else {
                                 const uris2 = await vscode.workspace.findFiles(
@@ -177,9 +211,17 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken) {
                                     cancellationToken
                                 );
                                 if (uris2.length > 0) {
+                                    processedPaths += 1;
+                                    if (onProgress) {
+                                        onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
+                                    }
                                     return [line, { fileUriPath: uris2[0].path, ...tokenMeta }];
                                 }
                             }
+                        }
+                        processedPaths += 1;
+                        if (onProgress) {
+                            onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
                         }
                     } else if (meta.type === "Symbol") {
                         return [line, { type: "Symbol", ...meta }];
@@ -202,7 +244,7 @@ function getHtmlForWebview() {
 			<meta charset="UTF-8">
 			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Cat Colors</title>
+			<title>Stack trace analyzer</title>
             <style nonce="${nonce}">
                 #current-stack-trace {
                     font-family: monospace;
@@ -216,9 +258,29 @@ function getHtmlForWebview() {
                     color: inherit;
                     text-decoration: underline;
                 }
+                #loading-container {
+                    height: 2px;
+                    width: 100%;
+                    overflow: hidden;
+                    position: relative;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }
+                #loading-container.loading {
+                    opacity: 1;
+                }
+                #loading-fill {
+                    height: 100%;
+                    background-color: var(--vscode-progressBar-background);
+                    width: 0%;
+                    transition: width 0.3s ease;
+                }
             </style>
 		</head>
 		<body>
+            <div id="loading-container">
+                <div id="loading-fill"></div>
+            </div>
             <div id="current-stack-trace">Call 'Analyze stack trace from clipboard' to see the stack trace</div>
 			<script nonce="${nonce}">
 				const vscode = acquireVsCodeApi();
@@ -278,6 +340,20 @@ function getHtmlForWebview() {
                                 vscode.setState({ lines: message.lines });
 								break;
 							}
+						case 'setLoadingState':
+							{
+                                const loadingContainer = document.querySelector('#loading-container');
+                                const loadingFill = document.querySelector('#loading-fill');
+                                
+                                if (message.isLoading) {
+                                    loadingContainer.classList.add('loading');
+                                    loadingFill.style.width = message.progress + '%';
+                                } else {
+                                    loadingContainer.classList.remove('loading');
+                                    setTimeout(() => { loadingFill.style.width = '0%'; }, 300);
+                                }
+								break;
+							}
 						case 'clearAnalyizedStackTraces':
 							{
 								document.querySelector('#current-stack-trace').innerText = "Call 'Analyze stack trace from clipboard' to see the stack trace";
@@ -289,6 +365,10 @@ function getHtmlForWebview() {
 			</script>
 		</body>
 		</html>`;
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 module.exports = {

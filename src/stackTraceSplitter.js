@@ -96,9 +96,12 @@ function regexMatchCount(str, regex) {
     return count;
 }
 
-exports.splitIntoTokens = function splitIntoTokens(trace) {
+exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
     const result = [];
     const lines = trace.split("\n");
+    
+    const totalLinesToProcess = lines.length;
+    let processedLines = 0;
 
     for (const preline of lines) {
         const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/gi);
@@ -124,6 +127,11 @@ exports.splitIntoTokens = function splitIntoTokens(trace) {
                 lineTokens = nextTokens;
             }
             result.push(lineTokens);
+            
+        }
+        processedLines++;
+        if (onProgress && totalLinesToProcess > 0) {
+            onProgress(processedLines / totalLinesToProcess);
         }
     }
     return result;
