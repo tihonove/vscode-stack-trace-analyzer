@@ -42,7 +42,8 @@
 				{
 					"id": "stack-trace-analyzer.root",
 					"type": "webview",
-					"name": "Stack trace analyzer"
+					"name": "Stack trace analyzer",
+					"icon": "src/stacktrace.svg"
 				}
 			]
 		},
@@ -71,6 +72,20 @@
 				"title": "Previous stack trace",
 				"icon": "$(chevron-left)",
 				"enablement": "stack-trace-analyzer.canSelectPrevStackTrace"
+			},
+			{
+				"command": "stack-trace-analyzer.disableVcsIntegration",
+				"category": "Stack Trace Analyzer",
+				"title": "Disable VCS Integration",
+				"icon": "$(git-pull-request-closed)",
+				"enablement": "true"
+			},
+			{
+				"command": "stack-trace-analyzer.enableVcsIntegration",
+				"category": "Stack Trace Analyzer",
+				"title": "Enable VCS Integration", 
+				"icon": "$(source-control)",
+				"enablement": "true"
 			}
 		],
 		"menus": {
@@ -84,6 +99,16 @@
 					"command": "stack-trace-analyzer.selectNextStackTrace",
 					"group": "navigation@2",
 					"when": "view == stack-trace-analyzer.root"
+				},
+				{
+					"command": "stack-trace-analyzer.disableVcsIntegration",
+					"group": "navigation@5",
+					"when": "view == stack-trace-analyzer.root && stack-trace-analyzer.vcsIntegrationEnabled"
+				},
+				{
+					"command": "stack-trace-analyzer.enableVcsIntegration",
+					"group": "navigation@5",
+					"when": "view == stack-trace-analyzer.root && !stack-trace-analyzer.vcsIntegrationEnabled"
 				},
 				{
 					"command": "stack-trace-analyzer.clearAnalyizedStackTraces",

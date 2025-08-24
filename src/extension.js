@@ -4,15 +4,20 @@ const { splitIntoTokens, getPossibleFilePathsToSearch } = require("./stackTraceS
 let view;
 const stackTraceInfos = [];
 let currentStackTraceFromLast = 0;
+let isVcsIntegrationEnabled = true;
 
 function restoreStackTracesFromWorkspaceState(context) {
     const prevStackTraceInfos = context.workspaceState.get("stack-trace-analyzer.stackTraceInfos", []);
     stackTraceInfos.splice(0, stackTraceInfos.length);
     stackTraceInfos.push(...prevStackTraceInfos);
+    
+    // Restore VCS integration state
+    isVcsIntegrationEnabled = context.workspaceState.get("stack-trace-analyzer.vcsIntegrationEnabled", true);
 }
 
 function storeStackTracesToWorkspaceState(context) {
     context.workspaceState.update("stack-trace-analyzer.stackTraceInfos", stackTraceInfos.slice(-10));
+    context.workspaceState.update("stack-trace-analyzer.vcsIntegrationEnabled", isVcsIntegrationEnabled);
 }
 
 function updateContext() {
@@ -25,6 +30,11 @@ function updateContext() {
         "setContext",
         "stack-trace-analyzer.canSelectNextStackTrace",
         currentStackTraceFromLast > 0
+    );
+    vscode.commands.executeCommand(
+        "setContext",
+        "stack-trace-analyzer.vcsIntegrationEnabled",
+        isVcsIntegrationEnabled
     );
 }
 
@@ -148,14 +158,16 @@ function activate(context) {
                         showStackTraceTokensInWebView(stackTraceInfo.lines);
                     }
 
-                    stackTraceInfo.lines = await enrichWorkspacePathsWithVscInfo(
-                        stackTraceInfo.lines, 
-                        cancellationToken,
-                        (progress) => {}
-                    );
-                    storeStackTracesToWorkspaceState(context);
-                    if (getCurrentStackTraceInfo() == stackTraceInfo) {
-                        showStackTraceTokensInWebView(stackTraceInfo.lines);
+                    if (isVcsIntegrationEnabled) {
+                        stackTraceInfo.lines = await enrichWorkspacePathsWithVscInfo(
+                            stackTraceInfo.lines, 
+                            cancellationToken,
+                            (progress) => {}
+                        );
+                        storeStackTracesToWorkspaceState(context);
+                        if (getCurrentStackTraceInfo() == stackTraceInfo) {
+                            showStackTraceTokensInWebView(stackTraceInfo.lines);
+                        }
                     }
 
 
@@ -181,11 +193,74 @@ function activate(context) {
             storeStackTracesToWorkspaceState(context);
         })
     );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("stack-trace-analyzer.disableVcsIntegration", async () => {
+            isVcsIntegrationEnabled = false;
+            updateContext();
+            
+            // Remove VCS info from all stack traces
+            for (const stackTrace of stackTraceInfos) {
+                if (stackTrace.lines) {
+                    stackTrace.lines = removeVcsInfoFromLines(stackTrace.lines);
+                }
+            }
+            
+            // Update current view
+            const currentStackTrace = getCurrentStackTraceInfo();
+            if (currentStackTrace && currentStackTrace.lines) {
+                showStackTraceTokensInWebView(currentStackTrace.lines);
+            }
+            
+            storeStackTracesToWorkspaceState(context);
+            vscode.window.showInformationMessage("VCS integration disabled");
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("stack-trace-analyzer.enableVcsIntegration", async () => {
+            isVcsIntegrationEnabled = true;
+            updateContext();
+            
+            if (stackTraceInfos.length > 0) {
+                await vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Window,
+                        title: "Enriching with VCS info...",
+                        cancellable: false,
+                    },
+                    async (progress) => {
+                        const cancellationToken = { isCancellationRequested: false };                        
+                        const stackTrace = getCurrentStackTraceInfo();
+                        if (stackTrace.lines) {
+                            stackTrace.lines = await enrichWorkspacePathsWithVscInfo(
+                                stackTrace.lines,
+                                cancellationToken,
+                                () => {}
+                            );
+                        }
+                        const currentStackTrace = getCurrentStackTraceInfo();
+                        if (currentStackTrace && currentStackTrace.lines) {
+                            showStackTraceTokensInWebView(currentStackTrace.lines);
+                        }                        
+                        storeStackTracesToWorkspaceState(context);
+                    }
+                );
+            }
+            
+            vscode.window.showInformationMessage("VCS integration enabled");
+        })
+    );
 }
 
 async function enrichWorkspacePathsWithVscInfo(lines, cancellationToken, onProgress) {
     try {
         if (cancellationToken.isCancellationRequested) {
+            return lines;
+        }
+        
+        // Check if VCS integration is disabled
+        if (!isVcsIntegrationEnabled) {
             return lines;
         }
         
@@ -588,6 +663,18 @@ function getHtmlForWebview() {
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function removeVcsInfoFromLines(lines) {
+    return lines.map(lineTokens => {
+        return lineTokens.map(([line, meta]) => {
+            if (meta && meta.vcsInfo) {
+                const { vcsInfo, ...metaWithoutVcs } = meta;
+                return [line, metaWithoutVcs];
+            }
+            return [line, meta];
+        });
+    });
 }
 
 module.exports = {
