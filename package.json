@@ -3,7 +3,7 @@
 	"displayName": "Stack trace analyzer",
 	"description": "Easy way to analyze stack traces from any language and sources",
 	"publisher": "tihonove",
-	"version": "1.8.0",
+	"version": "1.9.0",
 	"license": "MIT",
 	"engines": {
 		"vscode": "^1.74.0"
@@ -83,7 +83,7 @@
 			{
 				"command": "stack-trace-analyzer.enableVcsIntegration",
 				"category": "Stack Trace Analyzer",
-				"title": "Enable VCS Integration", 
+				"title": "Enable VCS Integration",
 				"icon": "$(source-control)",
 				"enablement": "true"
 			}
