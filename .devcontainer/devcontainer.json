@@ -7,6 +7,13 @@
 		},
 		"ghcr.io/devcontainers-community/npm-features/prettier:1": {}
 	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"Orta.vscode-jest"
+			]
+		}
+	},
 	"postCreateCommand": "npm install -g @vscode/vsce && npm install && echo 'Development environment ready!'",
 	"remoteUser": "vscode",
 	"mounts": [
