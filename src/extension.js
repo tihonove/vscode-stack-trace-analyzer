@@ -327,6 +327,68 @@ function getHtmlForWebview() {
                     color: var(--vscode-errorForeground, #ff8c00);
                     border-radius: 2px;
                     padding: 1px 2px;
+                    position: relative;
+                }
+                .file-path-recent .tooltip {
+                    visibility: hidden;
+                    opacity: 0;
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    z-index: 1000;
+                    background-color: var(--vscode-editorHoverWidget-background);
+                    border: 1px solid var(--vscode-editorHoverWidget-border);
+                    border-radius: 2px;
+                    padding: 0;
+                    color: var(--vscode-editorHoverWidget-foreground);
+                    font-size: 12px;
+                    white-space: nowrap;
+                    box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+                    transition: opacity 0.2s ease, visibility 0.2s ease;
+                    margin-top: 4px;
+                    font-family: var(--vscode-editor-font-family);
+                    min-width: 250px;
+                    overflow: hidden;
+                }
+                .file-path-recent:hover .tooltip {
+                    visibility: visible;
+                    opacity: 1;
+                }
+                .tooltip-row {
+                    padding: 8px 12px;
+                    border-bottom: 1px solid var(--vscode-editorHoverWidget-border);
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .tooltip-row:last-child {
+                    border-bottom: none;
+                }
+                .tooltip .commit-hash {
+                    color: var(--vscode-gitDecoration-modifiedResourceForeground);
+                    font-family: monospace;
+                    font-size: 11px;
+                    background-color: var(--vscode-badge-background);
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    margin-left: auto;
+                }
+                .tooltip .commit-message {
+                    color: var(--vscode-foreground);
+                    font-weight: 500;
+                    flex: 1;
+                    text-overflow: ellipsis;
+                    overflow: hidden;
+                }
+                .tooltip .commit-author {
+                    color: var(--vscode-descriptionForeground);
+                    font-size: 11px;
+                    flex: 1;
+                }
+                .tooltip .commit-date {
+                    color: var(--vscode-descriptionForeground);
+                    font-size: 11px;
+                    margin-left: auto;
                 }
                 #loading-container {
                     height: 2px;
@@ -348,6 +410,17 @@ function getHtmlForWebview() {
             </style>
 		</head>
 		<body>
+            <template id="tooltip-template"><div class="tooltip">
+                <div class="tooltip-row commit-message-row">
+                    <div class="commit-message"></div>
+                    <div class="commit-hash"></div>
+                </div>
+                <div class="tooltip-row commit-author-row">
+                    <div class="commit-author"></div>
+                    <div class="commit-date"></div>
+                </div>
+            </div></template>
+            
             <div id="loading-container">
                 <div id="loading-fill"></div>
             </div>
@@ -355,6 +428,68 @@ function getHtmlForWebview() {
 			<script nonce="${nonce}">
 				const vscode = acquireVsCodeApi();
                 const prevLines = (vscode.getState() || { lines: null }).lines;
+
+                function getTimeAgo(date) {
+                    const now = new Date();
+                    const diffMs = now - date;
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                    
+                    if (diffDays > 0) {
+                        return diffDays + ' day' + (diffDays > 1 ? 's' : '') + ' ago';
+                    } else if (diffHours > 0) {
+                        return diffHours + ' hour' + (diffHours > 1 ? 's' : '') + ' ago';
+                    } else if (diffMinutes > 0) {
+                        return diffMinutes + ' minute' + (diffMinutes > 1 ? 's' : '') + ' ago';
+                    } else {
+                        return 'just now';
+                    }
+                }
+
+                function createTooltip(lastCommit) {
+                    const template = document.querySelector('#tooltip-template');
+                    const tooltip = template.content.cloneNode(true);
+                    
+                    const messageRow = tooltip.querySelector('.commit-message-row');
+                    const authorRow = tooltip.querySelector('.commit-author-row');
+                    
+                    if (lastCommit.message) {
+                        tooltip.querySelector('.commit-message').textContent = lastCommit.message;
+                    } else {
+                        tooltip.querySelector('.commit-message').style.display = 'none';
+                    }
+                    
+                    if (lastCommit.hash) {
+                        const shortHash = lastCommit.hash.substring(0, 7);
+                        tooltip.querySelector('.commit-hash').textContent = shortHash;
+                    } else {
+                        tooltip.querySelector('.commit-hash').style.display = 'none';
+                    }
+                    
+                    if (lastCommit.authorName) {
+                        tooltip.querySelector('.commit-author').textContent = lastCommit.authorName;
+                    } else {
+                        tooltip.querySelector('.commit-author').style.display = 'none';
+                    }
+                    
+                    if (lastCommit.authorDate) {
+                        const date = new Date(lastCommit.authorDate);
+                        const timeAgo = getTimeAgo(date);
+                        tooltip.querySelector('.commit-date').textContent = timeAgo;
+                    } else {
+                        tooltip.querySelector('.commit-date').style.display = 'none';
+                    }
+                    
+                    if (!lastCommit.message && !lastCommit.hash) {
+                        messageRow.style.display = 'none';
+                    }
+                    if (!lastCommit.authorName && !lastCommit.authorDate) {
+                        authorRow.style.display = 'none';
+                    }
+                    
+                    return tooltip;
+                }
 
                 function showLines(lines) {
                     const element = document.querySelector('#current-stack-trace');
@@ -369,7 +504,6 @@ function getHtmlForWebview() {
                                 tokenElement.innerText = tokenText;
                                 tokenElement.href = "#";
                                 
-                                // Проверяем дату последнего коммита
                                 const lastCommit = token[1]?.vcsInfo?.lastChangeCommit;
                                 if (lastCommit && lastCommit.authorDate) {
                                     const commitDate = new Date(lastCommit.authorDate);
@@ -377,7 +511,9 @@ function getHtmlForWebview() {
                                     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                                     
                                     if (commitDate > sevenDaysAgo) {
-                                        tokenElement.classList.add('file-path-recent');
+                                        tokenElement.classList.add('file-path-recent');                                        
+                                        const tooltip = createTooltip(lastCommit);
+                                        tokenElement.appendChild(tooltip);
                                     }
                                 }
                                 
