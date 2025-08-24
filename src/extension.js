@@ -147,6 +147,18 @@ function activate(context) {
                     if (getCurrentStackTraceInfo() == stackTraceInfo) {
                         showStackTraceTokensInWebView(stackTraceInfo.lines);
                     }
+
+                    stackTraceInfo.lines = await enrichWorkspacePathsWithVscInfo(
+                        stackTraceInfo.lines, 
+                        cancellationToken,
+                        (progress) => {}
+                    );
+                    storeStackTracesToWorkspaceState(context);
+                    if (getCurrentStackTraceInfo() == stackTraceInfo) {
+                        showStackTraceTokensInWebView(stackTraceInfo.lines);
+                    }
+
+
                     if (view == undefined) {
                         vscode.window.showInformationMessage("Extension is still initializing, please wait...");
                     }
@@ -169,6 +181,58 @@ function activate(context) {
             storeStackTracesToWorkspaceState(context);
         })
     );
+}
+
+async function enrichWorkspacePathsWithVscInfo(lines, cancellationToken, onProgress) {
+    try {
+        if (cancellationToken.isCancellationRequested) {
+            return lines;
+        }
+        
+        const gitExtension = vscode.extensions.getExtension('vscode.git');
+        if (!gitExtension || !gitExtension.isActive) {
+            return lines;
+        }
+        
+        const api = gitExtension.exports.getAPI(1);
+        if (!api || !api.repositories || api.repositories.length === 0) {
+            return lines;
+        }
+        
+        return await Promise.all(
+            lines.map(async lineTokens => {
+                return await Promise.all(
+                    lineTokens.map(async ([line, meta]) => {
+                        if (cancellationToken.isCancellationRequested) return [line];
+                        if (meta == undefined) return [line];
+                        if (meta.type === "FilePath" && meta.fileUriPath) {
+                            try {
+                                for (const repository of api.repositories) {
+                                    if (cancellationToken.isCancellationRequested) return [line, meta];
+                                    try {
+                                        const historyItem = await repository.log({ 
+                                            path: meta.fileUriPath, 
+                                            maxEntries: 1 
+                                        });
+                                        if (historyItem && historyItem.length > 0) {
+                                            return [line, { ...meta, vcsInfo: { lastChangeCommit: historyItem[0] } }];
+                                        }
+                                    } catch (repoError) {
+                                        continue;
+                                    }
+                                }
+                            } catch {
+                                // skip
+                            }
+                        }
+                        return [line, meta];
+                    })
+                )
+            })
+        );
+    } catch (error) {
+        return lines;
+    }
 }
 
 async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress) {
@@ -258,6 +322,12 @@ function getHtmlForWebview() {
                     color: inherit;
                     text-decoration: underline;
                 }
+                .file-path-recent {
+                    background-color: var(--vscode-editorOverviewRuler-modifiedForeground, rgba(255, 140, 0, 0.2));
+                    color: var(--vscode-errorForeground, #ff8c00);
+                    border-radius: 2px;
+                    padding: 1px 2px;
+                }
                 #loading-container {
                     height: 2px;
                     width: 100%;
@@ -298,6 +368,19 @@ function getHtmlForWebview() {
                                 tokenElement = document.createElement('a');
                                 tokenElement.innerText = tokenText;
                                 tokenElement.href = "#";
+                                
+                                // Проверяем дату последнего коммита
+                                const lastCommit = token[1]?.vcsInfo?.lastChangeCommit;
+                                if (lastCommit && lastCommit.authorDate) {
+                                    const commitDate = new Date(lastCommit.authorDate);
+                                    const sevenDaysAgo = new Date();
+                                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                                    
+                                    if (commitDate > sevenDaysAgo) {
+                                        tokenElement.classList.add('file-path-recent');
+                                    }
+                                }
+                                
                                 tokenElement.onclick = () => {
                                     vscode.postMessage({
                                         type: 'OpenFile',
