@@ -65,7 +65,7 @@ function updateCurrentStackTraceIndex(updateFn) {
     updateContext();
 }
 
-function activate(context) {
+export function activate(context) {
     const provider = {
         resolveWebviewView: webviewView => {
             view = webviewView;
@@ -126,7 +126,7 @@ function activate(context) {
                 return;
             }
 
-            const stackTraceInfo = { source: clipboardContent };
+            const stackTraceInfo: any = { source: clipboardContent };
             stackTraceInfos.push(stackTraceInfo);
 
             currentStackTraceFromLast = 0;
@@ -677,7 +677,6 @@ function removeVcsInfoFromLines(lines) {
     });
 }
 
-module.exports = {
-    activate,
-    deactivate: () => {},
-};
+export function deactivate() {
+
+}

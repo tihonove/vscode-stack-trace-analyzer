@@ -2,7 +2,7 @@ const tokenizers = [
     [
         /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m.groups.line1 ?? m.groups.line2) };
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m.groups.line1 ?? m.groups.line2) };
             if (m.groups.col1 || m.groups.col2) {
                 result.column = Number(m.groups.col1 || m.groups.col2);
             }
@@ -12,7 +12,7 @@ const tokenizers = [
     [
         /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[2]), line: Number(m.groups.line1 ?? m.groups.line2) };
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[2]), line: Number(m.groups.line1 ?? m.groups.line2) };
             if (m.groups.col1 || m.groups.col2) {
                 result.column = Number(m.groups.col1 || m.groups.col2);
             }
@@ -26,7 +26,7 @@ const tokenizers = [
     [
         /webpack\:\[(.*?)\]\(.*?\)\?:(\d+)(?:\:(\d+))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
             if (m[3]) {
                 result.column = Number(m[3]);
             }
@@ -96,7 +96,7 @@ function regexMatchCount(str, regex) {
     return count;
 }
 
-exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
+export function splitIntoTokens(trace, onProgress = null) {
     const result = [];
     const lines = trace.split("\n");
     
@@ -105,6 +105,7 @@ exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
 
     for (const preline of lines) {
         const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/gi);
+        let lineOfLines;
         if (preline.length / (escapedNewLineCount - 1) > 100 || (preline.length / 240 && escapedNewLineCount > 5)) {
             lineOfLines = preline.replace(/\\n/gi, "\n").split("\n");
         } else {
@@ -137,7 +138,7 @@ exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
     return result;
 };
 
-exports.getPossibleFilePathsToSearch = function* getPossibleFilePathsToSearch(filePath) {
+export function* getPossibleFilePathsToSearch(filePath) {
     const parts = filePath.split(/[\/\\]/);
     const result = [];
     for (let i = 0; i < parts.length; i++) {

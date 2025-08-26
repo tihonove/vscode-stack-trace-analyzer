@@ -1,4 +1,4 @@
-const { splitIntoTokens } = require("../src/stackTraceSplitter");
+import { splitIntoTokens } from "../src/stackTraceSplitter";
 
 describe("C# stack traces", () => {
     test("Sample trace", () => {
