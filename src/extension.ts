@@ -390,9 +390,12 @@ function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.Uri) {
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
-			<meta http-equiv="Content-Security-Policy" content="content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+			<meta http-equiv="Content-Security-Policy" content="content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>Stack trace analyzer</title>
+            <script>
+                var exports = {};
+            </script>
             <link nonce="${nonce}" rel="stylesheet" href="${webviewCss}" />
 		</head>
 		<body>
