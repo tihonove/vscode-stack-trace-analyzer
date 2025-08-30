@@ -1,10 +1,14 @@
-const tokenizers = [
+import { TokenMeta, Token } from "./TokenMeta";
+
+type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
+
+const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
         /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
-        m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m.groups.line1 ?? m.groups.line2) };
-            if (m.groups.col1 || m.groups.col2) {
-                result.column = Number(m.groups.col1 || m.groups.col2);
+        (m: RegExpExecArray): TokenMeta => {
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
+            if (m.groups?.["col1"] || m.groups?.["col2"]) {
+                result.column = Number(m.groups["col1"] || m.groups["col2"]);
             }
             return result;
         },
@@ -12,9 +16,9 @@ const tokenizers = [
     [
         /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[2]), line: Number(m.groups.line1 ?? m.groups.line2) };
-            if (m.groups.col1 || m.groups.col2) {
-                result.column = Number(m.groups.col1 || m.groups.col2);
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[2] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
+            if (m.groups?.["col1"] || m.groups?.["col2"]) {
+                result.column = Number(m.groups?.["col1"] || m.groups?.["col2"]);
             }
             const resultList = [[m[2] + (m[6] ?? ""), result]]
             if (m[1]) {
@@ -26,7 +30,7 @@ const tokenizers = [
     [
         /webpack\:\[(.*?)\]\(.*?\)\?:(\d+)(?:\:(\d+))/gi,
         m => {
-            const result = { type: "FilePath", filePath: normalizeFilePath(m[1]), line: Number(m[2]) };
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m[2]) };
             if (m[3]) {
                 result.column = Number(m[3]);
             }
@@ -39,13 +43,13 @@ const tokenizers = [
     ],
     [
         /(at\s+)([\dа-яеёα-ωΑ-Ωא-תء-يๅ-๏ก-๛\w\.\: ]+?)(\s*\()/gi,
-        m => [
-            [m[1]],
+        (m: RegExpExecArray): Token[] => [
+            [m[1] ?? ""],
             ...intersperse(
-                m[2]
+                (m[2] ?? "")
                     .split(".")
-                    .reduce(
-                        (result, symbol) => [
+                    .reduce<Token[]>(
+                        (result: Token[], symbol: string): Token[] => [
                             ...result,
                             [
                                 symbol,
@@ -56,19 +60,19 @@ const tokenizers = [
                     ),
                 ["."]
             ),
-            [m[3]],
+            [m[3] ?? ""],
         ],
     ],
 ];
 
-function intersperse(arr, separator) {
-    return arr.length === 0 ? [] : arr.slice(1).reduce((r, item) => [...r, separator, item], [arr[0]]);
+function intersperse<T>(arr: T[], separator: T): T[] {
+    return arr.length === 0 ? [] : arr.slice(1).reduce<T[]>((r: T[], item: T) => [...r, separator, item], [arr[0] as T]);
 }
 
-const normalizeFilePath = filePath => filePath.replace(/[\/\\]+/g, "/");
+const normalizeFilePath = (filePath: string) => filePath.replace(/[\/\\]+/g, "/");
 
-function splitByRegex(input, regex, tokenFactory) {
-    const result = [];
+function splitByRegex(input: string, regex: RegExp, tokenFactory: TokenFactory): Token[] {
+    const result: Token[] = [];
     let lastIndex = 0;
     let match;
 
@@ -78,7 +82,7 @@ function splitByRegex(input, regex, tokenFactory) {
         }
         const tokenMeta = tokenFactory(match);
         if (Array.isArray(tokenMeta)) result.push(...tokenMeta);
-        else result.push([match[0], tokenFactory(match)]);
+        else result.push([match[0], tokenMeta]);
         lastIndex = regex.lastIndex;
     }
     if (lastIndex < input.length) {
@@ -87,16 +91,15 @@ function splitByRegex(input, regex, tokenFactory) {
     return result;
 }
 
-function regexMatchCount(str, regex) {
+function regexMatchCount(str: string, regex: RegExp): number {
     let count = 0;
-    let match;
-    while ((match = regex.exec(str)) !== null) {
+    while (regex.exec(str) != null) {
         count++;
     }
     return count;
 }
 
-exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
+export function splitIntoTokens(trace: string, onProgress: (null | ((progress: number) => void)) = null): Token[][] {
     const result = [];
     const lines = trace.split("\n");
     
@@ -105,6 +108,7 @@ exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
 
     for (const preline of lines) {
         const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/gi);
+        let lineOfLines;
         if (preline.length / (escapedNewLineCount - 1) > 100 || (preline.length / 240 && escapedNewLineCount > 5)) {
             lineOfLines = preline.replace(/\\n/gi, "\n").split("\n");
         } else {
@@ -112,7 +116,7 @@ exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
         }
 
         for (const line of lineOfLines) {
-            let lineTokens = [[line]];
+            let lineTokens: Token[] = [[line]];
 
             for (const tokenizer of tokenizers) {
                 const nextTokens = [];
@@ -137,11 +141,9 @@ exports.splitIntoTokens = function splitIntoTokens(trace, onProgress) {
     return result;
 };
 
-exports.getPossibleFilePathsToSearch = function* getPossibleFilePathsToSearch(filePath) {
+export function* getPossibleFilePathsToSearch(filePath: string): Generator<string> {
     const parts = filePath.split(/[\/\\]/);
-    const result = [];
     for (let i = 0; i < parts.length; i++) {
         yield parts.slice(i).join("/");
     }
-    return result;
-};
+}
