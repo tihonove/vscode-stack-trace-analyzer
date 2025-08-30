@@ -3,7 +3,7 @@
 	"displayName": "Stack trace analyzer",
 	"description": "Easy way to analyze stack traces from any language and sources",
 	"publisher": "tihonove",
-	"version": "1.10.1",
+	"version": "1.10.2",
 	"license": "MIT",
 	"engines": {
 		"vscode": "^1.74.0"
@@ -121,7 +121,7 @@
 	"scripts": {
 		"build": "tsc; copyfiles --flat src/webview/client/*.css out/webview/client",
 		"test": "jest",
-  		"prepublishOnly": "npm run build"
+		"prepublishOnly": "npm run build"
 	},
 	"devDependencies": {
 		"@types/jest": "^30.0.0",
