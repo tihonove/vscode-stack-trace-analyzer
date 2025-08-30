@@ -121,7 +121,7 @@
 	"scripts": {
 		"build": "tsc; copyfiles --flat src/webview/client/*.css out/webview/client",
 		"test": "jest",
-		"prepublishOnly": "npm run build"
+		"vscode:prepublish": "npm run build"
 	},
 	"devDependencies": {
 		"@types/jest": "^30.0.0",
