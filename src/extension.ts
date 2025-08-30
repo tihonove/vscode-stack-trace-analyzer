@@ -1,12 +1,19 @@
-const vscode = require("vscode");
-const { splitIntoTokens, getPossibleFilePathsToSearch } = require("./stackTraceSplitter.js");
+import vscode from "vscode";
+import { splitIntoTokens, getPossibleFilePathsToSearch } from "./stackTraceSplitter";
+import { Token } from "./TokenMeta";
 
-let view;
-const stackTraceInfos = [];
+let view: vscode.WebviewView | undefined;
+
+type StackTraceInfo = {
+    source: string;
+    lines?: Token[][];
+};
+
+const stackTraceInfos: StackTraceInfo[] = [];
 let currentStackTraceFromLast = 0;
 let isVcsIntegrationEnabled = true;
 
-function restoreStackTracesFromWorkspaceState(context) {
+function restoreStackTracesFromWorkspaceState(context: vscode.ExtensionContext) {
     const prevStackTraceInfos = context.workspaceState.get("stack-trace-analyzer.stackTraceInfos", []);
     stackTraceInfos.splice(0, stackTraceInfos.length);
     stackTraceInfos.push(...prevStackTraceInfos);
@@ -15,7 +22,7 @@ function restoreStackTracesFromWorkspaceState(context) {
     isVcsIntegrationEnabled = context.workspaceState.get("stack-trace-analyzer.vcsIntegrationEnabled", true);
 }
 
-function storeStackTracesToWorkspaceState(context) {
+function storeStackTracesToWorkspaceState(context: vscode.ExtensionContext) {
     context.workspaceState.update("stack-trace-analyzer.stackTraceInfos", stackTraceInfos.slice(-10));
     context.workspaceState.update("stack-trace-analyzer.vcsIntegrationEnabled", isVcsIntegrationEnabled);
 }
@@ -38,18 +45,18 @@ function updateContext() {
     );
 }
 
-function showStackTraceTokensInWebView(lines) {
+function showStackTraceTokensInWebView(lines: Token[][]) {
     if (lines == undefined) return;
     if (view == undefined) return;
     view.webview.postMessage({ type: "setStackTraceTokens", lines: lines });
 }
 
-function setLoadingState(isLoading, progress = 0) {
+function setLoadingState(isLoading: boolean, progress = 0) {
     if (view == undefined) return;
     view.webview.postMessage({ type: "setLoadingState", isLoading: isLoading, progress: progress });
 }
 
-function getCurrentStackTraceInfo() {
+function getCurrentStackTraceInfo(): StackTraceInfo | undefined {
     return stackTraceInfos[stackTraceInfos.length - 1 - currentStackTraceFromLast];
 }
 
@@ -58,19 +65,21 @@ function normalizeCurrentIndex() {
     if (currentStackTraceFromLast >= stackTraceInfos.length) currentStackTraceFromLast = stackTraceInfos.length - 1;
 }
 
-function updateCurrentStackTraceIndex(updateFn) {
+function updateCurrentStackTraceIndex(updateFn: (x: number) => number) {
     currentStackTraceFromLast = updateFn(currentStackTraceFromLast);
     normalizeCurrentIndex();
-    showStackTraceTokensInWebView(getCurrentStackTraceInfo()?.lines);
+    const current = getCurrentStackTraceInfo();
+    if (current != null && current.lines != null) 
+        showStackTraceTokensInWebView(current.lines);
     updateContext();
 }
 
-export function activate(context) {
+export function activate(context: vscode.ExtensionContext) {
     const provider = {
-        resolveWebviewView: webviewView => {
+        resolveWebviewView: (webviewView: vscode.WebviewView) => {
             view = webviewView;
             webviewView.webview.options = { enableScripts: true };
-            webviewView.webview.html = getHtmlForWebview();
+            webviewView.webview.html = getHtmlForWebview(webviewView.webview, context.extensionUri);
             webviewView.webview.onDidReceiveMessage(async data => {
                 switch (data.type) {
                     case "OpenFile": {
@@ -126,7 +135,7 @@ export function activate(context) {
                 return;
             }
 
-            const stackTraceInfo: any = { source: clipboardContent };
+            const stackTraceInfo: StackTraceInfo = { source: clipboardContent };
             stackTraceInfos.push(stackTraceInfo);
 
             currentStackTraceFromLast = 0;
@@ -135,7 +144,7 @@ export function activate(context) {
 
             await vscode.window.withProgress(
                 {
-                    location: vscode.ProgressLocation.Window,
+                    location: { viewId: "stack-trace-analyzer.root" },
                     title: "Analyzing stack trace...",
                     cancellable: true,
                 },
@@ -162,7 +171,7 @@ export function activate(context) {
                         stackTraceInfo.lines = await enrichWorkspacePathsWithVscInfo(
                             stackTraceInfo.lines, 
                             cancellationToken,
-                            (progress) => {}
+                            _ => {}
                         );
                         storeStackTracesToWorkspaceState(context);
                         if (getCurrentStackTraceInfo() == stackTraceInfo) {
@@ -225,14 +234,12 @@ export function activate(context) {
             if (stackTraceInfos.length > 0) {
                 await vscode.window.withProgress(
                     {
-                        location: vscode.ProgressLocation.Window,
+                        location: { viewId: "stack-trace-analyzer.root" },
                         title: "Enriching with VCS info...",
-                        cancellable: false,
                     },
-                    async (progress) => {
-                        const cancellationToken = { isCancellationRequested: false };                        
+                    async (progress, cancellationToken) => {
                         const stackTrace = getCurrentStackTraceInfo();
-                        if (stackTrace.lines) {
+                        if (stackTrace && stackTrace.lines) {
                             stackTrace.lines = await enrichWorkspacePathsWithVscInfo(
                                 stackTrace.lines,
                                 cancellationToken,
@@ -253,7 +260,7 @@ export function activate(context) {
     );
 }
 
-async function enrichWorkspacePathsWithVscInfo(lines, cancellationToken, onProgress) {
+async function enrichWorkspacePathsWithVscInfo(lines: Token[][], cancellationToken: vscode.CancellationToken, onProgress: (progress: number) => void): Promise<Token[][]> {
     try {
         if (cancellationToken.isCancellationRequested) {
             return lines;
@@ -310,7 +317,7 @@ async function enrichWorkspacePathsWithVscInfo(lines, cancellationToken, onProgr
     }
 }
 
-async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress) {
+async function echrichWorkspacePathsInToken(lines: Token[][], cancellationToken: vscode.CancellationToken, onProgress: (progress: number) => void): Promise<Token[][]> {
     let totalFilePathTokens = 0;
     for (const lineTokens of lines) {
         for (const [_, meta] of lineTokens) {
@@ -323,9 +330,9 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress
     let processedPaths = 0;
 
     return await Promise.all(
-        lines.map(async lineTokens => {
+        lines.map(async (lineTokens): Promise<Token[]> => {
             return await Promise.all(
-                lineTokens.map(async ([line, meta]) => {
+                lineTokens.map(async ([line, meta]): Promise<Token> => {
                     if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
                     if (meta.type === "FilePath") {
                         const { filePath, ...tokenMeta } = meta;
@@ -341,7 +348,7 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress
                                 if (onProgress) {
                                     onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
                                 }
-                                return [line, { fileUriPath: uris1[0].path, ...tokenMeta }];
+                                return [line, { ...tokenMeta, fileUriPath: uris1[0]?.path ?? "" }];
                             } else {
                                 const uris2 = await vscode.workspace.findFiles(
                                     "**/*/" + possibleFilePath,
@@ -354,7 +361,7 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress
                                     if (onProgress) {
                                         onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
                                     }
-                                    return [line, { fileUriPath: uris2[0].path, ...tokenMeta }];
+                                    return [line, { ...tokenMeta, fileUriPath: uris2[0]?.path ?? "" }];
                                 }
                             }
                         }
@@ -363,7 +370,7 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress
                             onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
                         }
                     } else if (meta.type === "Symbol") {
-                        return [line, { type: "Symbol", ...meta }];
+                        return [line, { ...meta }];
                     }
                     return [line];
                 })
@@ -374,115 +381,19 @@ async function echrichWorkspacePathsInToken(lines, cancellationToken, onProgress
 
 const randomString10 = () => (Math.random() + 1).toString(36).substring(2);
 
-function getHtmlForWebview() {
-    const nonce = randomString10();
+function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.Uri) {
+    const nonce = randomString10();    
+    const webviewCss = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "webview.css"));
+    const webviewJs = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "webview.js"));
 
     return `<!DOCTYPE html>
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+			<meta http-equiv="Content-Security-Policy" content="content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
 			<title>Stack trace analyzer</title>
-            <style nonce="${nonce}">
-                #current-stack-trace {
-                    font-family: monospace;
-                    white-space: pre-wrap;
-                }
-                .symbol {
-                    color: inherit;
-                    text-decoration: none;
-                }
-                .symbol:hover {
-                    color: inherit;
-                    text-decoration: underline;
-                }
-                .file-path-recent {
-                    background-color: var(--vscode-editorOverviewRuler-modifiedForeground, rgba(255, 140, 0, 0.2));
-                    color: var(--vscode-errorForeground, #ff8c00);
-                    border-radius: 2px;
-                    padding: 1px 2px;
-                    position: relative;
-                }
-                .file-path-recent .tooltip {
-                    visibility: hidden;
-                    opacity: 0;
-                    position: absolute;
-                    top: 100%;
-                    left: 0;
-                    z-index: 1000;
-                    background-color: var(--vscode-editorHoverWidget-background);
-                    border: 1px solid var(--vscode-editorHoverWidget-border);
-                    border-radius: 2px;
-                    padding: 0;
-                    color: var(--vscode-editorHoverWidget-foreground);
-                    font-size: 12px;
-                    white-space: nowrap;
-                    box-shadow: 0 4px 12px var(--vscode-widget-shadow);
-                    transition: opacity 0.2s ease, visibility 0.2s ease;
-                    margin-top: 4px;
-                    font-family: var(--vscode-editor-font-family);
-                    min-width: 250px;
-                    overflow: hidden;
-                }
-                .file-path-recent:hover .tooltip {
-                    visibility: visible;
-                    opacity: 1;
-                }
-                .tooltip-row {
-                    padding: 8px 12px;
-                    border-bottom: 1px solid var(--vscode-editorHoverWidget-border);
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .tooltip-row:last-child {
-                    border-bottom: none;
-                }
-                .tooltip .commit-hash {
-                    color: var(--vscode-gitDecoration-modifiedResourceForeground);
-                    font-family: monospace;
-                    font-size: 11px;
-                    background-color: var(--vscode-badge-background);
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    margin-left: auto;
-                }
-                .tooltip .commit-message {
-                    color: var(--vscode-foreground);
-                    font-weight: 500;
-                    flex: 1;
-                    text-overflow: ellipsis;
-                    overflow: hidden;
-                }
-                .tooltip .commit-author {
-                    color: var(--vscode-descriptionForeground);
-                    font-size: 11px;
-                    flex: 1;
-                }
-                .tooltip .commit-date {
-                    color: var(--vscode-descriptionForeground);
-                    font-size: 11px;
-                    margin-left: auto;
-                }
-                #loading-container {
-                    height: 2px;
-                    width: 100%;
-                    overflow: hidden;
-                    position: relative;
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
-                }
-                #loading-container.loading {
-                    opacity: 1;
-                }
-                #loading-fill {
-                    height: 100%;
-                    background-color: var(--vscode-progressBar-background);
-                    width: 0%;
-                    transition: width 0.3s ease;
-                }
-            </style>
+            <link nonce="${nonce}" rel="stylesheet" href="${webviewCss}" />
 		</head>
 		<body>
             <template id="tooltip-template"><div class="tooltip">
@@ -500,179 +411,23 @@ function getHtmlForWebview() {
                 <div id="loading-fill"></div>
             </div>
             <div id="current-stack-trace">Call 'Analyze stack trace from clipboard' to see the stack trace</div>
-			<script nonce="${nonce}">
-				const vscode = acquireVsCodeApi();
-                const prevLines = (vscode.getState() || { lines: null }).lines;
-
-                function getTimeAgo(date) {
-                    const now = new Date();
-                    const diffMs = now - date;
-                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-                    
-                    if (diffDays > 0) {
-                        return diffDays + ' day' + (diffDays > 1 ? 's' : '') + ' ago';
-                    } else if (diffHours > 0) {
-                        return diffHours + ' hour' + (diffHours > 1 ? 's' : '') + ' ago';
-                    } else if (diffMinutes > 0) {
-                        return diffMinutes + ' minute' + (diffMinutes > 1 ? 's' : '') + ' ago';
-                    } else {
-                        return 'just now';
-                    }
-                }
-
-                function createTooltip(lastCommit) {
-                    const template = document.querySelector('#tooltip-template');
-                    const tooltip = template.content.cloneNode(true);
-                    
-                    const messageRow = tooltip.querySelector('.commit-message-row');
-                    const authorRow = tooltip.querySelector('.commit-author-row');
-                    
-                    if (lastCommit.message) {
-                        tooltip.querySelector('.commit-message').textContent = lastCommit.message;
-                    } else {
-                        tooltip.querySelector('.commit-message').style.display = 'none';
-                    }
-                    
-                    if (lastCommit.hash) {
-                        const shortHash = lastCommit.hash.substring(0, 7);
-                        tooltip.querySelector('.commit-hash').textContent = shortHash;
-                    } else {
-                        tooltip.querySelector('.commit-hash').style.display = 'none';
-                    }
-                    
-                    if (lastCommit.authorName) {
-                        tooltip.querySelector('.commit-author').textContent = lastCommit.authorName;
-                    } else {
-                        tooltip.querySelector('.commit-author').style.display = 'none';
-                    }
-                    
-                    if (lastCommit.authorDate) {
-                        const date = new Date(lastCommit.authorDate);
-                        const timeAgo = getTimeAgo(date);
-                        tooltip.querySelector('.commit-date').textContent = timeAgo;
-                    } else {
-                        tooltip.querySelector('.commit-date').style.display = 'none';
-                    }
-                    
-                    if (!lastCommit.message && !lastCommit.hash) {
-                        messageRow.style.display = 'none';
-                    }
-                    if (!lastCommit.authorName && !lastCommit.authorDate) {
-                        authorRow.style.display = 'none';
-                    }
-                    
-                    return tooltip;
-                }
-
-                function showLines(lines) {
-                    const element = document.querySelector('#current-stack-trace');
-                    element.innerText = "";
-                    for (const lineTokens of lines) {
-                        const lineElement = document.createElement('div');
-                        for (const token of lineTokens) {
-                            const tokenText = token[0]; 
-                            let tokenElement;
-                            if (token[1]?.type == "FilePath") {
-                                tokenElement = document.createElement('a');
-                                tokenElement.innerText = tokenText;
-                                tokenElement.href = "#";
-                                
-                                const lastCommit = token[1]?.vcsInfo?.lastChangeCommit;
-                                if (lastCommit && lastCommit.authorDate) {
-                                    const commitDate = new Date(lastCommit.authorDate);
-                                    const sevenDaysAgo = new Date();
-                                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                                    
-                                    if (commitDate > sevenDaysAgo) {
-                                        tokenElement.classList.add('file-path-recent');                                        
-                                        const tooltip = createTooltip(lastCommit);
-                                        tokenElement.appendChild(tooltip);
-                                    }
-                                }
-                                
-                                tokenElement.onclick = () => {
-                                    vscode.postMessage({
-                                        type: 'OpenFile',
-                                        tokenMeta: token[1],
-                                    });
-                                };
-                            } else if (token[1]?.type == "Symbol") {
-                                tokenElement = document.createElement('a');
-                                tokenElement.classList.add('symbol');
-                                tokenElement.innerText = tokenText;
-                                tokenElement.href = "#";
-                                tokenElement.onclick = (event) => {
-                                    vscode.postMessage({
-                                        type: 'GoToSymbol',
-                                        tokenMeta: event.shiftKey 
-                                            ? { ...token[1], symbols: token[1].symbols.slice(-1) } 
-                                            : token[1],
-                                    });
-                                };
-                            } else {
-                                tokenElement = document.createElement('span');
-                                tokenElement.innerText = tokenText;
-                            }
-                            lineElement.appendChild(tokenElement);
-                        }
-                        element.appendChild(lineElement);
-                    }
-                }
-        
-                if (prevLines) {
-                    showLines(prevLines);
-                }
-
-				window.addEventListener('message', async event => {
-					const message = event.data;
-					switch (message.type) {
-						case 'setStackTraceTokens':
-							{
-                                showLines(message.lines);
-                                vscode.setState({ lines: message.lines });
-								break;
-							}
-						case 'setLoadingState':
-							{
-                                const loadingContainer = document.querySelector('#loading-container');
-                                const loadingFill = document.querySelector('#loading-fill');
-                                
-                                if (message.isLoading) {
-                                    loadingContainer.classList.add('loading');
-                                    loadingFill.style.width = message.progress + '%';
-                                } else {
-                                    loadingContainer.classList.remove('loading');
-                                    setTimeout(() => { loadingFill.style.width = '0%'; }, 300);
-                                }
-								break;
-							}
-						case 'clearAnalyizedStackTraces':
-							{
-								document.querySelector('#current-stack-trace').innerText = "Call 'Analyze stack trace from clipboard' to see the stack trace";
-                                vscode.setState({ lines: null });
-								break;
-							}
-					}
-				});
-			</script>
+			<script type="module" nonce="${nonce}" src="${webviewJs}"></script>
 		</body>
 		</html>`;
 }
 
-function delay(ms) {
+function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function removeVcsInfoFromLines(lines) {
+function removeVcsInfoFromLines(lines: Token[][]): Token[][] {
     return lines.map(lineTokens => {
-        return lineTokens.map(([line, meta]) => {
-            if (meta && meta.vcsInfo) {
+        return lineTokens.map(([line, meta]): Token => {
+            if (meta && "vcsInfo" in meta) {
                 const { vcsInfo, ...metaWithoutVcs } = meta;
                 return [line, metaWithoutVcs];
             }
-            return [line, meta];
+            return [line, meta]
         });
     });
 }

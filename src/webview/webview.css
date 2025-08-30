@@ -1,0 +1,111 @@
+#current-stack-trace {
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+
+.symbol {
+    color: inherit;
+    text-decoration: none;
+}
+
+.symbol:hover {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.file-path-recent {
+    background-color: var(--vscode-editorOverviewRuler-modifiedForeground, rgba(255, 140, 0, 0.2));
+    color: var(--vscode-errorForeground, #ff8c00);
+    border-radius: 2px;
+    padding: 1px 2px;
+    position: relative;
+}
+
+.file-path-recent .tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    background-color: var(--vscode-editorHoverWidget-background);
+    border: 1px solid var(--vscode-editorHoverWidget-border);
+    border-radius: 2px;
+    padding: 0;
+    color: var(--vscode-editorHoverWidget-foreground);
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    margin-top: 4px;
+    font-family: var(--vscode-editor-font-family);
+    min-width: 250px;
+    overflow: hidden;
+}
+
+.file-path-recent:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-row {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--vscode-editorHoverWidget-border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tooltip-row:last-child {
+    border-bottom: none;
+}
+
+.tooltip .commit-hash {
+    color: var(--vscode-gitDecoration-modifiedResourceForeground);
+    font-family: monospace;
+    font-size: 11px;
+    background-color: var(--vscode-badge-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: auto;
+}
+
+.tooltip .commit-message {
+    color: var(--vscode-foreground);
+    font-weight: 500;
+    flex: 1;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.tooltip .commit-author {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    flex: 1;
+}
+
+.tooltip .commit-date {
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    margin-left: auto;
+}
+
+#loading-container {
+    height: 2px;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#loading-container.loading {
+    opacity: 1;
+}
+
+#loading-fill {
+    height: 100%;
+    background-color: var(--vscode-progressBar-background);
+    width: 0%;
+    transition: width 0.3s ease;
+}

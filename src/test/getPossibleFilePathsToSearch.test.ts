@@ -1,4 +1,4 @@
-const { getPossibleFilePathsToSearch } = require("../out/stackTraceSplitter");
+import { getPossibleFilePathsToSearch } from "../stackTraceSplitter";
 
 describe("File path utils", () => {
     test("should generate all possible file paths to search", () => {
