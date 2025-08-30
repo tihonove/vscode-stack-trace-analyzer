@@ -1,4 +1,5 @@
 import { TokenMeta, Token } from "./TokenMeta";
+import { intersperse, regexMatchCount } from "./utils/commontUtils";
 
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
@@ -65,10 +66,6 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
     ],
 ];
 
-function intersperse<T>(arr: T[], separator: T): T[] {
-    return arr.length === 0 ? [] : arr.slice(1).reduce<T[]>((r: T[], item: T) => [...r, separator, item], [arr[0] as T]);
-}
-
 const normalizeFilePath = (filePath: string) => filePath.replace(/[\/\\]+/g, "/");
 
 function splitByRegex(input: string, regex: RegExp, tokenFactory: TokenFactory): Token[] {
@@ -89,14 +86,6 @@ function splitByRegex(input: string, regex: RegExp, tokenFactory: TokenFactory):
         result.push([input.slice(lastIndex)]);
     }
     return result;
-}
-
-function regexMatchCount(str: string, regex: RegExp): number {
-    let count = 0;
-    while (regex.exec(str) != null) {
-        count++;
-    }
-    return count;
 }
 
 export function splitIntoTokens(trace: string, onProgress: (null | ((progress: number) => void)) = null): Token[][] {
