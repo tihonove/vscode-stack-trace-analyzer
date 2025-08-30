@@ -120,10 +120,8 @@
 	},
 	"scripts": {
 		"build": "tsc; copyfiles --flat src/webview/client/*.css out/webview/client",
-		"pretest": "npm run build",
 		"test": "jest",
-		"compile": "npm run build",
-		"package": "npm run build && vsce package"
+  		"prepublishOnly": "npm run build"
 	},
 	"devDependencies": {
 		"@types/jest": "^30.0.0",
