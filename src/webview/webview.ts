@@ -1,7 +1,7 @@
 import type { CommitInfo, Token } from "../TokenMeta";
 
 const vscode = acquireVsCodeApi();
-    // @ts-ignore
+// @ts-ignore
 const prevLines = (vscode.getState() || { lines: null }).lines;
 
 function getTimeAgo(date: Date) {
@@ -146,25 +146,6 @@ window.addEventListener("message", async event => {
         case "setStackTraceTokens": {
             showLines(message.lines);
             vscode.setState({ lines: message.lines });
-            break;
-        }
-        case "setLoadingState": {
-            const loadingContainer = document.querySelector("#loading-container");
-            const loadingFill = document.querySelector("#loading-fill") as HTMLElement;
-
-            if (loadingFill == null || loadingContainer == null) {
-                return;
-            }
-
-            if (message.isLoading) {
-                loadingContainer.classList.add("loading");
-                loadingFill.style.width = message.progress + "%";
-            } else {
-                loadingContainer.classList.remove("loading");
-                setTimeout(() => {
-                    loadingFill.style.width = "0%";
-                }, 300);
-            }
             break;
         }
         case "clearAnalyizedStackTraces": {

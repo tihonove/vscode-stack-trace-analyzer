@@ -1,4 +1,5 @@
 import { TokenMeta, Token } from "./TokenMeta";
+import { delay } from "./utils/asyncUtils";
 
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
@@ -104,7 +105,6 @@ export function splitIntoTokens(trace: string, onProgress: (null | ((progress: n
     const lines = trace.split("\n");
     
     const totalLinesToProcess = lines.length;
-    let processedLines = 0;
 
     for (const preline of lines) {
         const escapedNewLineCount = regexMatchCount(trace, /\\n\s+/gi);
@@ -133,9 +133,8 @@ export function splitIntoTokens(trace: string, onProgress: (null | ((progress: n
             result.push(lineTokens);
             
         }
-        processedLines++;
         if (onProgress && totalLinesToProcess > 0) {
-            onProgress(processedLines / totalLinesToProcess);
+            onProgress(1 / totalLinesToProcess);
         }
     }
     return result;

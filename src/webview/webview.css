@@ -89,23 +89,3 @@
     font-size: 11px;
     margin-left: auto;
 }
-
-#loading-container {
-    height: 2px;
-    width: 100%;
-    overflow: hidden;
-    position: relative;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-#loading-container.loading {
-    opacity: 1;
-}
-
-#loading-fill {
-    height: 100%;
-    background-color: var(--vscode-progressBar-background);
-    width: 0%;
-    transition: width 0.3s ease;
-}

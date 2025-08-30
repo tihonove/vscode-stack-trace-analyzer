@@ -52,11 +52,6 @@ function showStackTraceTokensInWebView(lines: Token[][]) {
     view.webview.postMessage({ type: "setStackTraceTokens", lines: lines });
 }
 
-function setLoadingState(isLoading: boolean, progress = 0) {
-    if (view == undefined) return;
-    view.webview.postMessage({ type: "setLoadingState", isLoading: isLoading, progress: progress });
-}
-
 function getCurrentStackTraceInfo(): StackTraceInfo | undefined {
     return stackTraceInfos[stackTraceInfos.length - 1 - currentStackTraceFromLast];
 }
@@ -149,18 +144,19 @@ export function activate(context: vscode.ExtensionContext) {
                     title: "Analyzing stack trace...",
                     cancellable: true,
                 },
-                async (_, cancellationToken) => {
-                    setLoadingState(true, 0);
+                async (progress, cancellationToken) => {
                   
-                    stackTraceInfo.lines = splitIntoTokens(clipboardContent, (progress) => {
-                        setLoadingState(true, Math.round(progress * 10));
+                    progress.report({ message: "Parsing stacktrace" });
+                    stackTraceInfo.lines = splitIntoTokens(clipboardContent, (progressIncrementValue) => {
+                        progress.report({ increment: progressIncrementValue * 10 });
                     });
                     showStackTraceTokensInWebView(stackTraceInfo.lines.map(x => x.map(t => [t[0]])));
                     
+                    progress.report({ message: "Searching files" });
                     stackTraceInfo.lines = await echrichWorkspacePathsInToken(
                         stackTraceInfo.lines, 
                         cancellationToken,
-                        (progress) => setLoadingState(true, Math.round(10 + progress * 90))
+                        (progressIncrementValue) => progress.report({ increment: progressIncrementValue * 90 })
                     );
                     storeStackTracesToWorkspaceState(context);
                                         
@@ -184,10 +180,6 @@ export function activate(context: vscode.ExtensionContext) {
                     if (view == undefined) {
                         vscode.window.showInformationMessage("Extension is still initializing, please wait...");
                     }
-                    
-                    setLoadingState(true, 100);
-                    await delay(300);
-                    setLoadingState(false, 0);
                 }
             );
         })
@@ -328,8 +320,6 @@ async function echrichWorkspacePathsInToken(lines: Token[][], cancellationToken:
         }
     }
 
-    let processedPaths = 0;
-
     return await Promise.all(
         lines.map(async (lineTokens): Promise<Token[]> => {
             return await Promise.all(
@@ -345,9 +335,8 @@ async function echrichWorkspacePathsInToken(lines: Token[][], cancellationToken:
                                 cancellationToken
                             );
                             if (uris1.length > 0) {
-                                processedPaths += 1;
-                                if (onProgress) {
-                                    onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
+                                if (onProgress && totalFilePathTokens > 0) {
+                                    onProgress(1 / totalFilePathTokens);
                                 }
                                 return [line, { ...tokenMeta, fileUriPath: uris1[0]?.path ?? "" }];
                             } else {
@@ -358,17 +347,15 @@ async function echrichWorkspacePathsInToken(lines: Token[][], cancellationToken:
                                     cancellationToken
                                 );
                                 if (uris2.length > 0) {
-                                    processedPaths += 1;
-                                    if (onProgress) {
-                                        onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
+                                    if (onProgress && totalFilePathTokens > 0) {
+                                        onProgress(1 / totalFilePathTokens);
                                     }
                                     return [line, { ...tokenMeta, fileUriPath: uris2[0]?.path ?? "" }];
                                 }
                             }
                         }
-                        processedPaths += 1;
-                        if (onProgress) {
-                            onProgress(totalFilePathTokens > 0 ? processedPaths / totalFilePathTokens : 1);
+                        if (onProgress && totalFilePathTokens > 0) {
+                            onProgress(1 / totalFilePathTokens);
                         }
                     } else if (meta.type === "Symbol") {
                         return [line, { ...meta }];
@@ -411,9 +398,6 @@ function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.Uri) {
                 </div>
             </div></template>
             
-            <div id="loading-container">
-                <div id="loading-fill"></div>
-            </div>
             <div id="current-stack-trace">Call 'Analyze stack trace from clipboard' to see the stack trace</div>
 			<script type="module" nonce="${nonce}" src="${webviewJs}"></script>
 		</body>
