@@ -55,8 +55,8 @@ export class StackTraceWebViewPanel {
     private getHtmlForWebview() {
         const extensionUri = this.context.extensionUri;
         const nonce = this.randomString10();
-        const webviewCss = this.webviewView.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "webview.css"));
-        const webviewJs = this.webviewView.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "webview.js"));
+        const webviewCss = this.webviewView.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "client", "webview.css"));
+        const webviewJs = this.webviewView.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "client", "webview.js"));
 
         return `<!DOCTYPE html>
             <html lang="en">

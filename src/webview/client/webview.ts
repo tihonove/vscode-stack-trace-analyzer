@@ -1,4 +1,4 @@
-import type { CommitInfo, Token } from "../TokenMeta";
+import type { CommitInfo, Token } from "../../TokenMeta";
 
 const vscode = acquireVsCodeApi();
 // @ts-ignore

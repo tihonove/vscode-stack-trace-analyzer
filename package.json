@@ -119,7 +119,7 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc; copyfiles --flat src/webview/*.css out/webview",
+		"build": "tsc; copyfiles --flat src/webview/client/*.css out/webview/client",
 		"pretest": "npm run build",
 		"test": "jest",
 		"compile": "npm run build",
