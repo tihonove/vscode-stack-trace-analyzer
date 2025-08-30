@@ -1,9 +1,9 @@
 import vscode from "vscode";
 import { splitIntoTokens, getPossibleFilePathsToSearch } from "./stackTraceSplitter";
 import { Token } from "./TokenMeta";
-import { delay } from "./utils/asyncUtils";
+import { StackTraceWebViewPanel } from "./webview/StackTraceWebViewPanel";
 
-let view: vscode.WebviewView | undefined;
+let view: StackTraceWebViewPanel | undefined;
 
 type StackTraceInfo = {
     source: string;
@@ -49,7 +49,8 @@ function updateContext() {
 function showStackTraceTokensInWebView(lines: Token[][]) {
     if (lines == undefined) return;
     if (view == undefined) return;
-    view.webview.postMessage({ type: "setStackTraceTokens", lines: lines });
+    view.setStackTraceTokens(lines);
+    
 }
 
 function getCurrentStackTraceInfo(): StackTraceInfo | undefined {
@@ -71,39 +72,11 @@ function updateCurrentStackTraceIndex(updateFn: (x: number) => number) {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    const provider = {
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider("stack-trace-analyzer.root", {
         resolveWebviewView: (webviewView: vscode.WebviewView) => {
-            view = webviewView;
-            webviewView.webview.options = { enableScripts: true };
-            webviewView.webview.html = getHtmlForWebview(webviewView.webview, context.extensionUri);
-            webviewView.webview.onDidReceiveMessage(async data => {
-                switch (data.type) {
-                    case "OpenFile": {
-                        const tokenMeta = data.tokenMeta;
-                        const textDocument = await vscode.workspace.openTextDocument(tokenMeta.fileUriPath);
-                        const editor = await vscode.window.showTextDocument(textDocument);
-                        if (tokenMeta.line != undefined) {
-                            const position = new vscode.Position(tokenMeta.line - 1, (tokenMeta.column ?? 1) - 1);
-                            const newSelection = new vscode.Selection(position, position);
-                            editor.selection = newSelection;
-                            editor.revealRange(newSelection, vscode.TextEditorRevealType.InCenter);
-                        }
-                        break;
-                    }
-                    case "GoToSymbol": {
-                        const tokenMeta = data.tokenMeta;
-                        vscode.commands.executeCommand(
-                            "workbench.action.quickOpen",
-                            "#" + tokenMeta.symbols.reverse().slice(0, 2).join(" ")
-                        );
-                        break;
-                    }
-                }
-            });
+            view = new StackTraceWebViewPanel(context, webviewView);
         },
-    };
-
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider("stack-trace-analyzer.root", provider));
+    }));
 
     restoreStackTracesFromWorkspaceState(context);
     updateContext();
@@ -123,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand("stack-trace-analyzer.analyzeStackTraceFromClipboard", async () => {
             if (view == undefined) await vscode.commands.executeCommand("stack-trace-analyzer.root.focus");
-            if (view != undefined) view.show?.(true);
+            if (view != undefined) view.show();
 
             const clipboardContent = await vscode.env.clipboard.readText();
             if (clipboardContent === stackTraceInfos[stackTraceInfos.length - 1]?.source) {
@@ -188,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand("stack-trace-analyzer.clearAnalyizedStackTraces", () => {
             if (view == undefined) return;
-            view.webview.postMessage({ type: "clearAnalyizedStackTraces" });
+            view.clearAnalyizedStackTraces();
             stackTraceInfos.splice(0, stackTraceInfos.length);
             currentStackTraceFromLast = 0;
             updateContext();
@@ -365,43 +338,6 @@ async function echrichWorkspacePathsInToken(lines: Token[][], cancellationToken:
             );
         })
     );
-}
-
-const randomString10 = () => (Math.random() + 1).toString(36).substring(2);
-
-function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.Uri) {
-    const nonce = randomString10();    
-    const webviewCss = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "webview.css"));
-    const webviewJs = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "webview.js"));
-
-    return `<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta http-equiv="Content-Security-Policy" content="content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>Stack trace analyzer</title>
-            <script>
-                var exports = {};
-            </script>
-            <link nonce="${nonce}" rel="stylesheet" href="${webviewCss}" />
-		</head>
-		<body>
-            <template id="tooltip-template"><div class="tooltip">
-                <div class="tooltip-row commit-message-row">
-                    <div class="commit-message"></div>
-                    <div class="commit-hash"></div>
-                </div>
-                <div class="tooltip-row commit-author-row">
-                    <div class="commit-author"></div>
-                    <div class="commit-date"></div>
-                </div>
-            </div></template>
-            
-            <div id="current-stack-trace">Call 'Analyze stack trace from clipboard' to see the stack trace</div>
-			<script type="module" nonce="${nonce}" src="${webviewJs}"></script>
-		</body>
-		</html>`;
 }
 
 function removeVcsInfoFromLines(lines: Token[][]): Token[][] {

@@ -1,5 +1,4 @@
 import { TokenMeta, Token } from "./TokenMeta";
-import { delay } from "./utils/asyncUtils";
 
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
