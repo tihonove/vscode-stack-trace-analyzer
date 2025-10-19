@@ -5,27 +5,7 @@ type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
-        // C/C++ debugger (cppdbg) stack trace format: FunctionName(params) (path/to/file.c:line)
-        /\(((?:\w:[\/\\]|[\/\\])[\w\/\\\-\.]+\.(c|cpp|cc|cxx|h|hpp)):(\d+)\)/gi,
-        (m: RegExpExecArray): Token[] => {
-            const filePath = m[1] ?? "";
-            const lineNumber = m[3] ?? "0";
-            
-            const result: any = {
-                type: "FilePath",
-                filePath: normalizeFilePath(filePath),
-                line: Number(lineNumber),
-            };
-            
-            return [
-                ["("],
-                [m[1] + ":" + m[3], result],
-                [")"],
-            ];
-        },
-    ],
-    [
-        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{1,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         (m: RegExpExecArray): TokenMeta => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -35,7 +15,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.([\d\w]{1,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         m => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[2] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -59,7 +39,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{2,5}))/gi,
+        /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.([\d\w]{1,5}))/gi,
         m => ({ type: "FilePath", filePath: normalizeFilePath(m[0]) }),
     ],
     [

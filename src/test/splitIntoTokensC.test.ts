@@ -26,8 +26,7 @@ main(int argc, char ** argv) (\\workspaces\\postgres\\src\\backend\\main\\main.c
         
         // Test the first line with function and file path
         expect(matches[1]).toEqual([
-            ["RelationCloseCleanup(Relation relation) "],
-            ["("],
+            ["RelationCloseCleanup(Relation relation) ("],
             [
                 "\\workspaces\\postgres\\src\\backend\\utils\\cache\\relcache.c:2210",
                 {
@@ -41,8 +40,7 @@ main(int argc, char ** argv) (\\workspaces\\postgres\\src\\backend\\main\\main.c
 
         // Test another line with multiple parameters
         expect(matches[3]).toEqual([
-            ["relation_close(Relation relation, LOCKMODE lockmode, LOCKMODE lockmode@entry) "],
-            ["("],
+            ["relation_close(Relation relation, LOCKMODE lockmode, LOCKMODE lockmode@entry) ("],
             [
                 "\\workspaces\\postgres\\src\\backend\\access\\common\\relation.c:212",
                 {
@@ -64,8 +62,7 @@ ExecEndPlan(EState * estate) (/workspaces/postgres/src/backend/executor/execMain
         var matches = splitIntoTokens(trace);
         
         expect(matches[1]).toEqual([
-            ["main(int argc, char ** argv) "],
-            ["("],
+            ["main(int argc, char ** argv) ("],
             [
                 "/workspaces/postgres/src/backend/main/main.c:199",
                 {
@@ -87,8 +84,7 @@ ExecEndPlan(EState * estate) (C:\\Users\\dev\\postgres\\src\\backend\\executor\\
         var matches = splitIntoTokens(trace);
         
         expect(matches[1]).toEqual([
-            ["main(int argc, char ** argv) "],
-            ["("],
+            ["main(int argc, char ** argv) ("],
             [
                 "C:\\workspaces\\postgres\\src\\backend\\main\\main.c:199",
                 {
