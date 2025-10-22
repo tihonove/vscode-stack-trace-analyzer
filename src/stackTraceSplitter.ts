@@ -4,6 +4,35 @@ import { intersperse, regexMatchCount } from "./utils/commontUtils";
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
+    // Rust panic message format: "', filepath:line:column" (after panic message)
+    [
+        /(?<=',\s)((?:[A-Z]:[\/\\]|\.?\.?[\/\\])?[\w\-\.\/\\]+\.rs):(\d+):(\d+)/gi,
+        (m: RegExpExecArray): TokenMeta => {
+            const result: any = {
+                type: "FilePath",
+                filePath: normalizeFilePath(m[1] ?? ""),
+                line: Number(m[2]),
+                column: Number(m[3])
+            };
+            return result;
+        },
+    ],
+    // Rust backtrace format: " at filepath:line:column"
+    [
+        /(at\s+)((?:[A-Z]:[\/\\]|\.?\.?[\/\\])?[\w\-\.\/\\]+\.rs):(\d+):(\d+)/gi,
+        (m: RegExpExecArray): Token[] => {
+            const result: any = {
+                type: "FilePath",
+                filePath: normalizeFilePath(m[2] ?? ""),
+                line: Number(m[3]),
+                column: Number(m[4])
+            };
+            return [
+                [m[1] ?? ""],
+                [(m[2] ?? "") + ":" + m[3] + ":" + m[4], result]
+            ];
+        },
+    ],
     [
         /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         (m: RegExpExecArray): TokenMeta => {

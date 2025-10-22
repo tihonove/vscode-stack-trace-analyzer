@@ -1,7 +1,7 @@
 import { splitIntoTokens } from "../stackTraceSplitter";
 
 describe("Rust stack traces", () => {
-    test.skip("Basic Rust panic", () => {
+    test("Basic Rust panic", () => {
         const trace = `thread 'main' panicked at 'called \`Option::unwrap()\` on a \`None\` value', src/main.rs:10:9  
 stack backtrace:  
    0: rust_begin_unwind  
@@ -32,7 +32,7 @@ stack backtrace:
         ]);
     });
 
-    test.skip("Rust panic with file paths in backtrace", () => {
+    test("Rust panic with file paths in backtrace", () => {
         const trace = `thread 'main' panicked at 'index out of bounds: the len is 3 but the index is 5', src/lib.rs:42:5
 stack backtrace:
    0: rust_begin_unwind
@@ -75,11 +75,11 @@ stack backtrace:
             ],
         ]);
 
-        expect(matches[9]).toEqual([
+        expect(matches[8]).toEqual([
             ["   3: myapp::process_data"],
         ]);
 
-        expect(matches[10]).toEqual([
+        expect(matches[9]).toEqual([
             ["             "],
             ["at "],
             [
@@ -114,7 +114,7 @@ note: run with \`RUST_BACKTRACE=1\` environment variable to display a backtrace`
         ]);
     });
 
-    test.skip("Rust panic with Windows paths", () => {
+    test("Rust panic with Windows paths", () => {
         const trace = `thread 'main' panicked at 'division by zero', C:\\Users\\developer\\project\\src\\math.rs:15:5
 stack backtrace:
    0: std::panicking::begin_panic
@@ -168,7 +168,7 @@ stack backtrace:
         ]);
     });
 
-    test.skip("Rust panic with unwrap error", () => {
+    test("Rust panic with unwrap error", () => {
         const trace = `thread 'main' panicked at 'called \`Result::unwrap()\` on an \`Err\` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }', src/file_handler.rs:23:37
 stack backtrace:
    0: rust_begin_unwind
@@ -193,7 +193,7 @@ stack backtrace:
             ],
         ]);
 
-        expect(matches[4]).toEqual([
+        expect(matches[5]).toEqual([
             ["             "],
             ["at "],
             [
@@ -208,7 +208,7 @@ stack backtrace:
         ]);
     });
 
-    test.skip("Rust panic with module paths", () => {
+    test("Rust panic with module paths", () => {
         const trace = `thread 'main' panicked at 'explicit panic', src/utils/parser.rs:67:9
 stack backtrace:
    0: rust_begin_unwind
@@ -235,7 +235,7 @@ stack backtrace:
             ],
         ]);
 
-        expect(matches[4]).toEqual([
+        expect(matches[5]).toEqual([
             ["             "],
             ["at "],
             [
@@ -249,7 +249,7 @@ stack backtrace:
             ],
         ]);
 
-        expect(matches[6]).toEqual([
+        expect(matches[7]).toEqual([
             ["             "],
             ["at "],
             [
@@ -264,7 +264,7 @@ stack backtrace:
         ]);
     });
 
-    test.skip("Rust panic with workspace paths", () => {
+    test("Rust panic with workspace paths", () => {
         const trace = `thread 'main' panicked at 'not implemented', /home/developer/workspace/myproject/backend/src/api/handlers.rs:102:13
 stack backtrace:
    0: std::panicking::begin_panic
@@ -288,7 +288,7 @@ stack backtrace:
             ],
         ]);
 
-        expect(matches[3]).toEqual([
+        expect(matches[4]).toEqual([
             ["             "],
             ["at "],
             [
