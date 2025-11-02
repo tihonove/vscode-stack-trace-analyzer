@@ -3,28 +3,25 @@ import { intersperse, regexMatchCount } from "./utils/commontUtils";
 
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
+const HTML_ANCHOR_TAG_REGEX = /<\/?a>/gi;
+
+const createFilePathToken = (filePath: string, groups: RegExpExecArray["groups"]): TokenMeta => {
+    const cleanedPath = filePath.replace(/^file:\/\/\//, "");
+    const result: any = { type: "FilePath", filePath: normalizeFilePath(cleanedPath), line: Number(groups?.["line1"] ?? groups?.["line2"]) };
+    if (groups?.["col1"] || groups?.["col2"]) {
+        result.column = Number(groups["col1"] || groups["col2"]);
+    }
+    return result;
+};
+
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
         /(file:\/\/\/\w\:[\/\\]([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
-        (m: RegExpExecArray): TokenMeta => {
-            const filePath = (m[1] ?? "").replace(/^file:\/\/\//, "");
-            const result: any = { type: "FilePath", filePath: normalizeFilePath(filePath), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
-            if (m.groups?.["col1"] || m.groups?.["col2"]) {
-                result.column = Number(m.groups["col1"] || m.groups["col2"]);
-            }
-            return result;
-        },
+        (m: RegExpExecArray): TokenMeta => createFilePathToken(m[1] ?? "", m.groups),
     ],
     [
         /((?:file:\/\/\/)?(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
-        (m: RegExpExecArray): TokenMeta => {
-            const filePath = (m[1] ?? "").replace(/^file:\/\/\//, "");
-            const result: any = { type: "FilePath", filePath: normalizeFilePath(filePath), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
-            if (m.groups?.["col1"] || m.groups?.["col2"]) {
-                result.column = Number(m.groups["col1"] || m.groups["col2"]);
-            }
-            return result;
-        },
+        (m: RegExpExecArray): TokenMeta => createFilePathToken(m[1] ?? "", m.groups),
     ],
     [
         /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
@@ -118,7 +115,7 @@ export function splitIntoTokens(trace: string, onProgress: (null | ((progress: n
         for (const line of lineOfLines) {
             // Strip HTML anchor tags (e.g., <a>...</a>) before processing
             // but preserve C# generic type syntax like <anonymous> or <GetAllPagedAsync>
-            const cleanedLine = line.replace(/<\/?a>/gi, '');
+            const cleanedLine = line.replace(HTML_ANCHOR_TAG_REGEX, '');
             let lineTokens: Token[] = [[cleanedLine]];
 
             for (const tokenizer of tokenizers) {
