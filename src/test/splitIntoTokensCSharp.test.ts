@@ -187,4 +187,39 @@ DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadReque
             [")"],
         ]);
     });
+
+    test("Stack trace with HTML tags and file:/// URLs", () => {
+        const trace = `System.NullReferenceException : Object reference not set to an instance of an object.
+at <a>ClickHouse</a>.<a>Client</a>.<a>Formats</a>.<a>HttpParameterFormatter</a>.<a>Format</a>(ClickHouseDbParameter parameter, TypeSettings settings)
+at <a>ClickHouse</a>.<a>Client</a>.<a>ADO</a>.<a>ClickHouseCommand</a>.<a>BuildHttpRequestMessageWithQueryParams</a>(String sqlQuery, ClickHouseUriBuilder uriBuilder)
+at <a>ClickHouse</a>.<a>Client</a>.<a>ADO</a>.<a>ClickHouseCommand</a>.<a>PostSqlQueryAsync</a>(String sqlQuery, CancellationToken token)
+at <a>ClickHouse</a>.<a>Client</a>.<a>ADO</a>.<a>ClickHouseCommand</a>.<a>ExecuteDbDataReaderAsync</a>(CommandBehavior behavior, CancellationToken cancellationToken)
+at <a>TestCity</a>.<a>Core</a>.<a>Clickhouse</a>.<a>FormattableStringExtensions</a>.<a>ExecuteQueryAsync</a>(IClickHouseConnection connection, FormattableString query) in file:///C:/Users/user/source/TestCity.Core/Clickhouse/FormattableStringExtensions.cs:line 42`;
+
+        var matches = splitIntoTokens(trace);
+        
+        // Test the last line with file path
+        expect(matches[5]).toEqual([
+            ["at "],
+            ["ClickHouse", { type: "Symbol", symbols: ["ClickHouse"] }],
+            ["."],
+            ["Client", { type: "Symbol", symbols: ["ClickHouse", "Client"] }],
+            ["."],
+            ["ADO", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO"] }],
+            ["."],
+            ["ClickHouseCommand", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO", "ClickHouseCommand"] }],
+            ["."],
+            ["ExecuteDbDataReaderAsync", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO", "ClickHouseCommand", "ExecuteDbDataReaderAsync"] }],
+            ["("],
+            ["CommandBehavior behavior, CancellationToken cancellationToken) in "],
+            [
+                "file:///C:/Users/user/source/TestCity.Core/Clickhouse/FormattableStringExtensions.cs:line 42",
+                {
+                    type: "FilePath",
+                    filePath: "C:/Users/user/source/TestCity.Core/Clickhouse/FormattableStringExtensions.cs",
+                    line: 42,
+                },
+            ],
+        ]);
+    });
 });
