@@ -5,9 +5,21 @@ type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
-        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        /(file:\/\/\/\w\:[\/\\]([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         (m: RegExpExecArray): TokenMeta => {
-            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
+            const filePath = (m[1] ?? "").replace(/^file:\/\/\//, "");
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(filePath), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
+            if (m.groups?.["col1"] || m.groups?.["col2"]) {
+                result.column = Number(m.groups["col1"] || m.groups["col2"]);
+            }
+            return result;
+        },
+    ],
+    [
+        /((?:file:\/\/\/)?(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        (m: RegExpExecArray): TokenMeta => {
+            const filePath = (m[1] ?? "").replace(/^file:\/\/\//, "");
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(filePath), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
                 result.column = Number(m.groups["col1"] || m.groups["col2"]);
             }
@@ -104,7 +116,10 @@ export function splitIntoTokens(trace: string, onProgress: (null | ((progress: n
         }
 
         for (const line of lineOfLines) {
-            let lineTokens: Token[] = [[line]];
+            // Strip HTML anchor tags (e.g., <a>...</a>) before processing
+            // but preserve C# generic type syntax like <anonymous> or <GetAllPagedAsync>
+            const cleanedLine = line.replace(/<\/?a>/gi, '');
+            let lineTokens: Token[] = [[cleanedLine]];
 
             for (const tokenizer of tokenizers) {
                 const nextTokens = [];

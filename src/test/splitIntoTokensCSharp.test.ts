@@ -201,17 +201,17 @@ at <a>TestCity</a>.<a>Core</a>.<a>Clickhouse</a>.<a>FormattableStringExtensions<
         // Test the last line with file path
         expect(matches[5]).toEqual([
             ["at "],
-            ["ClickHouse", { type: "Symbol", symbols: ["ClickHouse"] }],
+            ["TestCity", { type: "Symbol", symbols: ["TestCity"] }],
             ["."],
-            ["Client", { type: "Symbol", symbols: ["ClickHouse", "Client"] }],
+            ["Core", { type: "Symbol", symbols: ["TestCity", "Core"] }],
             ["."],
-            ["ADO", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO"] }],
+            ["Clickhouse", { type: "Symbol", symbols: ["TestCity", "Core", "Clickhouse"] }],
             ["."],
-            ["ClickHouseCommand", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO", "ClickHouseCommand"] }],
+            ["FormattableStringExtensions", { type: "Symbol", symbols: ["TestCity", "Core", "Clickhouse", "FormattableStringExtensions"] }],
             ["."],
-            ["ExecuteDbDataReaderAsync", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO", "ClickHouseCommand", "ExecuteDbDataReaderAsync"] }],
+            ["ExecuteQueryAsync", { type: "Symbol", symbols: ["TestCity", "Core", "Clickhouse", "FormattableStringExtensions", "ExecuteQueryAsync"] }],
             ["("],
-            ["CommandBehavior behavior, CancellationToken cancellationToken) in "],
+            ["IClickHouseConnection connection, FormattableString query) in "],
             [
                 "file:///C:/Users/user/source/TestCity.Core/Clickhouse/FormattableStringExtensions.cs:line 42",
                 {
