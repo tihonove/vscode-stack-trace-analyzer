@@ -1,4 +1,5 @@
-# Stack trace analyzer
+# Stack trace analyzer [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/tihonove.stack-trace-analyzer?label=vscode)](https://marketplace.visualstudio.com/items?itemName=tihonove.stack-trace-analyzer) [![Open VSX Version](https://img.shields.io/open-vsx/v/tihonove/stack-trace-analyzer)](https://open-vsx.org/extension/tihonove/stack-trace-analyzer)
+
 
 Stack trace analyzer - Easy way to analyze stack traces from any language and sources.
 
