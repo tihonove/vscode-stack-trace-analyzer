@@ -398,4 +398,79 @@ src/Pages/MergeRequestJobsPage.tsx(57,22): error TS2741: Property 'indentLevel' 
             [": error TS18048: 'groupNode.groups' is possibly 'undefined'."],
         ]);
     });
+
+    test("Stack trace - vexx project", () => {
+        const trace = `TypeError: Cannot read properties of undefined (reading 'char')
+    at Grid.updateCell (src/Rendering/Grid.ts:48:22)
+    at TerminalScreen.setCell (src/Application/TerminalScreen.ts:22:14)
+    at RenderContext.withOffset (src/Elements/TUIElement.ts:14:31)
+    at BoxElement.render (src/Elements/BoxElement.ts:4:18)
+    at ScrollContainerElement.render (src/Elements/ScrollContainerElement.ts:35:9)
+    at TuiApplication.renderFrame (src/Application/TuiApplication.ts:18:24)
+    at TuiApplication.handleInput (src/Application/TuiApplication.ts:37:14)
+    at NodeTerminalBackend.<anonymous> (src/TerminalBackend/NodeTerminalBackend.ts:28:17)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)`;
+
+        var matches = splitIntoTokens(trace);
+        expect(matches[1]).toEqual([
+            ["    "],
+            ["at "],
+            [
+                "Grid",
+                {
+                    type: "Symbol",
+                    symbols: ["Grid"],
+                },
+            ],
+            ["."],
+            [
+                "updateCell",
+                {
+                    type: "Symbol",
+                    symbols: ["Grid", "updateCell"],
+                },
+            ],
+            [" ("],
+            [
+                "src/Rendering/Grid.ts:48:22",
+                {
+                    type: "FilePath",
+                    filePath: "src/Rendering/Grid.ts",
+                    line: 48,
+                    column: 22,
+                },
+            ],
+            [")"],
+        ]);
+        expect(matches[6]).toEqual([
+            ["    "],
+            ["at "],
+            [
+                "TuiApplication",
+                {
+                    type: "Symbol",
+                    symbols: ["TuiApplication"],
+                },
+            ],
+            ["."],
+            [
+                "renderFrame",
+                {
+                    type: "Symbol",
+                    symbols: ["TuiApplication", "renderFrame"],
+                },
+            ],
+            [" ("],
+            [
+                "src/Application/TuiApplication.ts:18:24",
+                {
+                    type: "FilePath",
+                    filePath: "src/Application/TuiApplication.ts",
+                    line: 18,
+                    column: 24,
+                },
+            ],
+            [")"],
+        ]);
+    });
 });
