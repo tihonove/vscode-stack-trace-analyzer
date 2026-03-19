@@ -187,12 +187,11 @@ describe("Ruby stack traces", () => {
         var matches = splitIntoTokens(trace);
         
         expect(matches[0]).toEqual([
-            ["."],
             [
-                "/lib/parser.rb:45",
+                "./lib/parser.rb:45",
                 {
                     type: "FilePath",
-                    filePath: "/lib/parser.rb",
+                    filePath: "./lib/parser.rb",
                     line: 45,
                 },
             ],
@@ -200,12 +199,12 @@ describe("Ruby stack traces", () => {
         ]);
 
         expect(matches[1]).toEqual([
-            ["    "],
+            ["    from "],
             [
-                "from ./lib/processor.rb:20",
+                "./lib/processor.rb:20",
                 {
                     type: "FilePath",
-                    filePath: "from ./lib/processor.rb",
+                    filePath: "./lib/processor.rb",
                     line: 20,
                 },
             ],
