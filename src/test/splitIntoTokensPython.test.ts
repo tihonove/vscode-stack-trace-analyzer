@@ -119,12 +119,12 @@ ValueError: Invalid format`;
         var matches = splitIntoTokens(trace);
         
         expect(matches[1]).toEqual([
-            ["  File \"."],
+            ["  File \""],
             [
-                "/src/main.py",
+                "./src/main.py",
                 {
                     type: "FilePath",
-                    filePath: "/src/main.py",
+                    filePath: "./src/main.py",
                 },
             ],
             ["\", line 100, in process_data"],

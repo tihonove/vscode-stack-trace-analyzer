@@ -27,6 +27,31 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         ],
     ],
     [
+        /(?<![\/\\])(\.\.?[\/\\](?:[^\/\\\s\(\):]+[\/\\])*[^\/\\\s\(\):]+\.[\d\w]{2,5})((?:\??\:(?:line )?(?<line1>\d+)(?:\:(?<col1>\d+))?)|(?:\((?<line2>\d+)\)))/gi,
+        (m: RegExpExecArray): TokenMeta => {
+            const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
+            if (m.groups?.["col1"]) {
+                result.column = Number(m.groups["col1"]);
+            }
+            return result;
+        },
+    ],
+    [
+        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))\((\d+)(?!,)\)/gi,
+        (m: RegExpExecArray): TokenMeta => ({
+            type: "FilePath",
+            filePath: normalizeFilePath(m[1] ?? ""),
+            line: Number(m[5]),
+        } as any),
+    ],
+    [
+        /(?<![\/\\])(\.\.?[\/\\](?:[^\/\\\s\(\):]+[\/\\])*[^\/\\\s\(\):]+\.[\d\w]{2,5})/gi,
+        (m: RegExpExecArray): TokenMeta => ({
+            type: "FilePath",
+            filePath: normalizeFilePath(m[1] ?? ""),
+        } as any),
+    ],
+    [
         /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         (m: RegExpExecArray): TokenMeta => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
