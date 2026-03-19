@@ -5,7 +5,7 @@ type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
-        /([a-zA-Z]:[\/][^\s\t\n\r\(\):]+\.[\d\w]{2,5}):(\d+)/g,
+        /(?<![a-zA-Z])([a-zA-Z]:[\/][^\s\t\n\r\(\):]+\.[\d\w]{2,5}):(\d+)/g,
         (m: RegExpExecArray): TokenMeta => ({
             type: "FilePath",
             filePath: normalizeFilePath(m[1] ?? ""),
