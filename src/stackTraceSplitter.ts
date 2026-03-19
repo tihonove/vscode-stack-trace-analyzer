@@ -5,6 +5,28 @@ type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
+        /(?<=',\s)(\S+):(\d+):(\d+)/g,
+        (m: RegExpExecArray): TokenMeta => ({
+            type: "FilePath",
+            filePath: normalizeFilePath(m[1] ?? ""),
+            line: Number(m[2]),
+            column: Number(m[3]),
+        } as any),
+    ],
+    [
+        /(\s+)(at\s+)((?:\.?[\/\\]|\w:[\/\\])\S+):(\d+):(\d+)/g,
+        (m: RegExpExecArray): Token[] => [
+            [m[1] ?? ""],
+            [m[2] ?? ""],
+            [(m[3] ?? "") + ":" + (m[4] ?? "") + ":" + (m[5] ?? ""), {
+                type: "FilePath",
+                filePath: normalizeFilePath(m[3] ?? ""),
+                line: Number(m[4]),
+                column: Number(m[5]),
+            } as any],
+        ],
+    ],
+    [
         /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
         (m: RegExpExecArray): TokenMeta => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
