@@ -5,6 +5,14 @@ type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
+        /(?<![a-zA-Z])([a-zA-Z]:[\/][^\s\t\n\r\(\):]+\.[\d\w]{2,5}):(\d+)/g,
+        (m: RegExpExecArray): TokenMeta => ({
+            type: "FilePath",
+            filePath: normalizeFilePath(m[1] ?? ""),
+            line: Number(m[2]),
+        } as any),
+    ],
+    [
         /(?<=',\s)(\S+):(\d+):(\d+)/g,
         (m: RegExpExecArray): TokenMeta => ({
             type: "FilePath",
@@ -110,6 +118,22 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
             ),
             [m[3] ?? ""],
         ],
+    ],
+    [
+        /^(created by )?(\w+)\.([^.()]+)(.*)/g,
+        (m: RegExpExecArray): Token[] => {
+            const prefix = m[1] ?? "";
+            const sym1 = m[2] ?? "";
+            const sym2 = m[3] ?? "";
+            const rest = m[4] ?? "";
+            const result: Token[] = [];
+            if (prefix) result.push([prefix]);
+            result.push([sym1, { type: "Symbol", symbols: [sym1] }]);
+            result.push(["."]);
+            result.push([sym2, { type: "Symbol", symbols: [sym1, sym2] }]);
+            if (rest) result.push([rest]);
+            return result;
+        },
     ],
 ];
 

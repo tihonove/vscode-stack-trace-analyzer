@@ -1,7 +1,7 @@
 import { splitIntoTokens } from "../stackTraceSplitter";
 
 describe("Go stack traces", () => {
-    test.skip("Basic Go panic", () => {
+    test("Basic Go panic", () => {
         const trace = `panic: runtime error: index out of range [3] with length 3
 
 goroutine 1 [running]:
@@ -43,7 +43,7 @@ main.main()
         ]);
     });
 
-    test.skip("Go panic with multiple stack frames", () => {
+    test("Go panic with multiple stack frames", () => {
         const trace = `panic: division by zero
 
 goroutine 1 [running]:
@@ -120,7 +120,7 @@ main.main()
         ]);
     });
 
-    test.skip("Go panic with package paths", () => {
+    test("Go panic with package paths", () => {
         const trace = `panic: runtime error: invalid memory address or nil pointer dereference
 [signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x4a1f3e]
 
@@ -134,7 +134,7 @@ main.main()
 
         var matches = splitIntoTokens(trace);
         
-        expect(matches[3]).toEqual([
+        expect(matches[4]).toEqual([
             [
                 "github",
                 {
@@ -153,7 +153,7 @@ main.main()
             [".(*Connection).Query(0x0, 0xc000010230, 0x1e)"],
         ]);
 
-        expect(matches[4]).toEqual([
+        expect(matches[5]).toEqual([
             ["    "],
             [
                 "/go/src/github.com/user/project/pkg/database/connection.go:45",
@@ -166,7 +166,7 @@ main.main()
             [" +0x3e"],
         ]);
 
-        expect(matches[5]).toEqual([
+        expect(matches[6]).toEqual([
             [
                 "github",
                 {
@@ -186,7 +186,7 @@ main.main()
         ]);
     });
 
-    test.skip("Go panic with Windows paths", () => {
+    test("Go panic with Windows paths", () => {
         const trace = `panic: runtime error: slice bounds out of range [5:3]
 
 goroutine 1 [running]:
@@ -229,7 +229,7 @@ main.main()
         ]);
     });
 
-    test.skip("Go panic with multiple goroutines", () => {
+    test("Go panic with multiple goroutines", () => {
         const trace = `panic: send on closed channel
 
 goroutine 7 [running]:
@@ -309,7 +309,7 @@ main.main()
         ]);
     });
 
-    test.skip("Go panic with relative paths", () => {
+    test("Go panic with relative paths", () => {
         const trace = `panic: assignment to entry in nil map
 
 goroutine 1 [running]:

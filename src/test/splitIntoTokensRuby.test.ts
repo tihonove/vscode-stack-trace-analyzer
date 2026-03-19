@@ -153,12 +153,11 @@ describe("Ruby stack traces", () => {
         var matches = splitIntoTokens(trace);
         
         expect(matches[0]).toEqual([
-            ["C:"],
             [
-                "/Users/developer/project/app.rb:30",
+                "C:/Users/developer/project/app.rb:30",
                 {
                     type: "FilePath",
-                    filePath: "/Users/developer/project/app.rb",
+                    filePath: "C:/Users/developer/project/app.rb",
                     line: 30,
                 },
             ],
@@ -166,12 +165,12 @@ describe("Ruby stack traces", () => {
         ]);
 
         expect(matches[1]).toEqual([
-            ["    from C:"],
+            ["    from "],
             [
-                "/Users/developer/project/main.rb:8",
+                "C:/Users/developer/project/main.rb:8",
                 {
                     type: "FilePath",
-                    filePath: "/Users/developer/project/main.rb",
+                    filePath: "C:/Users/developer/project/main.rb",
                     line: 8,
                 },
             ],
