@@ -98,6 +98,30 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         m => ({ type: "FilePath", filePath: normalizeFilePath(m[0]) }),
     ],
     [
+        /(at\s+)((?:<a>[^<]+<\/a>\.)*<a>[^<]+<\/a>)(\s*\()/gi,
+        (m: RegExpExecArray): Token[] => {
+            const rawParts = (m[2] ?? "").split(".");
+            const cleanParts = rawParts.map(p => p.replace(/<\/?a>/g, ""));
+            return [
+                [m[1] ?? ""],
+                ...intersperse(
+                    rawParts.reduce<Token[]>(
+                        (result: Token[], rawSymbol: string, i: number): Token[] => [
+                            ...result,
+                            [
+                                rawSymbol,
+                                { type: "Symbol", symbols: cleanParts.slice(0, i + 1) },
+                            ],
+                        ],
+                        []
+                    ),
+                    ["."]
+                ),
+                [m[3] ?? ""],
+            ];
+        },
+    ],
+    [
         /(at\s+)([\dа-яеёα-ωΑ-Ωא-תء-يๅ-๏ก-๛\w\.\: ]+?)(\s*\()/gi,
         (m: RegExpExecArray): Token[] => [
             [m[1] ?? ""],

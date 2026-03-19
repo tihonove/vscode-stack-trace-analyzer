@@ -187,4 +187,43 @@ DiadocSys.Core.Exceptions.DomainException: ErrorCode: ClientError (Http.BadReque
             [")"],
         ]);
     });
+
+    test("C# stack trace with <a> HTML tags wrapping identifiers", () => {
+        const trace = `System.NullReferenceException : Object reference not set to an instance of an object.
+at <a>ClickHouse</a>.<a>Client</a>.<a>Formats</a>.<a>HttpParameterFormatter</a>.<a>Format</a>(ClickHouseDbParameter parameter, TypeSettings settings)
+at <a>ClickHouse</a>.<a>Client</a>.<a>ADO</a>.<a>ClickHouseCommand</a>.<a>BuildHttpRequestMessageWithQueryParams</a>(String sqlQuery, ClickHouseUriBuilder uriBuilder)
+at <a>ClickHouse</a>.<a>Client</a>.<a>ADO</a>.<a>ClickHouseCommand</a>.<a>PostSqlQueryAsync</a>(String sqlQuery, CancellationToken token)`;
+
+        var matches = splitIntoTokens(trace);
+
+        expect(matches[1]).toEqual([
+            ["at "],
+            ["<a>ClickHouse</a>", { type: "Symbol", symbols: ["ClickHouse"] }],
+            ["."],
+            ["<a>Client</a>", { type: "Symbol", symbols: ["ClickHouse", "Client"] }],
+            ["."],
+            ["<a>Formats</a>", { type: "Symbol", symbols: ["ClickHouse", "Client", "Formats"] }],
+            ["."],
+            ["<a>HttpParameterFormatter</a>", { type: "Symbol", symbols: ["ClickHouse", "Client", "Formats", "HttpParameterFormatter"] }],
+            ["."],
+            ["<a>Format</a>", { type: "Symbol", symbols: ["ClickHouse", "Client", "Formats", "HttpParameterFormatter", "Format"] }],
+            ["("],
+            ["ClickHouseDbParameter parameter, TypeSettings settings)"],
+        ]);
+
+        expect(matches[2]).toEqual([
+            ["at "],
+            ["<a>ClickHouse</a>", { type: "Symbol", symbols: ["ClickHouse"] }],
+            ["."],
+            ["<a>Client</a>", { type: "Symbol", symbols: ["ClickHouse", "Client"] }],
+            ["."],
+            ["<a>ADO</a>", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO"] }],
+            ["."],
+            ["<a>ClickHouseCommand</a>", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO", "ClickHouseCommand"] }],
+            ["."],
+            ["<a>BuildHttpRequestMessageWithQueryParams</a>", { type: "Symbol", symbols: ["ClickHouse", "Client", "ADO", "ClickHouseCommand", "BuildHttpRequestMessageWithQueryParams"] }],
+            ["("],
+            ["String sqlQuery, ClickHouseUriBuilder uriBuilder)"],
+        ]);
+    });
 });
