@@ -7,7 +7,7 @@ Stack trace analyzer - Easy way to analyze stack traces from any language and so
 
 - Analyze stack traces from clipboard with a single command.
 - Automatically highlights and links file paths and line numbers in stack traces.
-- Supports stack traces from the following programming languages: C, C#, Go, Java, JavaScript, PHP, Python, Ruby, Rust.
+- Supports any programming language as it uses the built-in index.
 - Handles stack traces even if paths partially do not match (e.g., due to CI builds).
 
 ## Commands
@@ -27,7 +27,18 @@ Stack trace analyzer - Easy way to analyze stack traces from any language and so
 ## Troubleshooting
 
 If your stack trace is not working, please open an issue on [GitHub](https://github.com/tihonove/vscode-stack-trace-analyzer/issues).
-Successfully tested on C, C#, Go, Java, JavaScript, PHP, Python, Ruby, and Rust projects.
+
+Successfully tested on the following languages:
+
+- C
+- C#
+- Go
+- Java
+- JavaScript
+- PHP
+- Python
+- Ruby
+- Rust
 
 ## License
 
