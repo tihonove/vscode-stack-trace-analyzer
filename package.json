@@ -18,6 +18,19 @@
 	"categories": [
 		"Programming Languages"
 	],
+	"keywords": [
+		"stack trace",
+		"stack trace analyzer",
+		"C",
+		"C#",
+		"Go",
+		"Java",
+		"JavaScript",
+		"PHP",
+		"Python",
+		"Ruby",
+		"Rust"
+	],
 	"icon": "./logo.png",
 	"activationEvents": [],
 	"main": "./out/extension.js",
