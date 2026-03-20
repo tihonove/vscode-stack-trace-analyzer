@@ -1,7 +1,37 @@
 import { TokenMeta, Token } from "./TokenMeta";
 import { intersperse, regexMatchCount } from "./utils/commontUtils";
 
+function re(flags: string): (strings: TemplateStringsArray, ...values: RegExp[]) => RegExp;
+function re(strings: TemplateStringsArray, ...values: RegExp[]): RegExp;
+function re(stringsOrFlags: TemplateStringsArray | string, ...values: RegExp[]): RegExp | ((strings: TemplateStringsArray, ...values: RegExp[]) => RegExp) {
+    const build = (strings: TemplateStringsArray, values: RegExp[], flags?: string): RegExp => {
+        let source = '';
+        for (let i = 0; i < strings.length; i++) {
+            source += strings[i];
+            if (i < values.length) {
+                source += values[i]!.source;
+            }
+        }
+        return new RegExp(source, flags);
+    };
+    if (typeof stringsOrFlags === 'string') {
+        return (strings: TemplateStringsArray, ...values: RegExp[]) => build(strings, values, stringsOrFlags);
+    }
+    return build(stringsOrFlags, values);
+}
+
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
+
+/**
+ * Matches:
+ *   :line 123:45
+ *   :123:45
+ *   (123,45)
+ *   (123)
+ *   ?:line 123
+ *   ?:123
+ */
+const lineAndColumn = /((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/;
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
@@ -60,7 +90,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         } as any),
     ],
     [
-        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        re("gi")`${/((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))/}${lineAndColumn}`,
         (m: RegExpExecArray): TokenMeta => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -70,7 +100,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        re("gi")`${/(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))/}${lineAndColumn}`,
         m => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[2] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
