@@ -33,6 +33,26 @@ type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
  */
 const lineAndColumn = /((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/;
 
+/** Matches file extension: .c, .h, .ts, .java, .rs, etc. */
+const fileExtension = /\.(c|h|[\d\w]{2,5})/;
+
+/**
+ * Matches the start of a file path:
+ *   C:\\  (Windows drive)
+ *   /    (Unix root)
+ *   a    (relative: letter, digit or dot)
+ */
+const pathStart = /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])/;
+
+/** Matches a path segment (directory or file name), allows spaces inside */
+const pathSegment = /[^\/\\\t\n\r\(\):]*[^\/\\\s\(\):]/;
+
+/** Matches a path segment, no spaces allowed */
+const strictPathSegment = /[^\/\\\s\(\):]+/;
+
+/** Matches directory separators: / or \ (one or more) */
+const dirSeparator = /[\/\\]+/;
+
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
         /(?<![a-zA-Z])([a-zA-Z]:[\/][^\s\t\n\r\(\):]+\.[\d\w]{2,5}):(\d+)/g,
@@ -90,7 +110,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         } as any),
     ],
     [
-        re("gi")`${/((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))/}${lineAndColumn}`,
+        re("gi")`(${pathStart}(${pathSegment}${dirSeparator})+(${pathSegment}${fileExtension}))${lineAndColumn}`,
         (m: RegExpExecArray): TokenMeta => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -100,7 +120,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        re("gi")`${/(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))/}${lineAndColumn}`,
+        re("gi")`${/(\s*at\s)?/}((${pathSegment}${dirSeparator})*(${pathSegment}${fileExtension}))${lineAndColumn}`,
         m => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[2] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -124,7 +144,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.(c|h|[\d\w]{2,5}))/gi,
+        re("gi")`${pathStart}(${strictPathSegment}${dirSeparator})+(${strictPathSegment}${fileExtension})`,
         m => ({ type: "FilePath", filePath: normalizeFilePath(m[0]) }),
     ],
     [
