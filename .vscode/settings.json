@@ -2,5 +2,6 @@
     "jest.runMode": "on-demand",
     "chat.tools.terminal.autoApprove": {
         "npx jest": true
-    }
+    },
+    "jestrunner.enableTestExplorer": true
 }

@@ -1,7 +1,57 @@
 import { TokenMeta, Token } from "./TokenMeta";
 import { intersperse, regexMatchCount } from "./utils/commontUtils";
 
+function re(flags: string): (strings: TemplateStringsArray, ...values: RegExp[]) => RegExp;
+function re(strings: TemplateStringsArray, ...values: RegExp[]): RegExp;
+function re(stringsOrFlags: TemplateStringsArray | string, ...values: RegExp[]): RegExp | ((strings: TemplateStringsArray, ...values: RegExp[]) => RegExp) {
+    const build = (strings: TemplateStringsArray, values: RegExp[], flags?: string): RegExp => {
+        let source = '';
+        for (let i = 0; i < strings.length; i++) {
+            source += strings[i];
+            if (i < values.length) {
+                source += values[i]!.source;
+            }
+        }
+        return new RegExp(source, flags);
+    };
+    if (typeof stringsOrFlags === 'string') {
+        return (strings: TemplateStringsArray, ...values: RegExp[]) => build(strings, values, stringsOrFlags);
+    }
+    return build(stringsOrFlags, values);
+}
+
 type TokenFactory = (match: RegExpExecArray) => TokenMeta | Token[];
+
+/**
+ * Matches:
+ *   :line 123:45
+ *   :123:45
+ *   (123,45)
+ *   (123)
+ *   ?:line 123
+ *   ?:123
+ */
+const lineAndColumn = /((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/;
+
+/** Matches file extension: .c, .h, .ts, .java, .rs, etc. */
+const fileExtension = /\.(c|h|[\d\w]{2,5})/;
+
+/**
+ * Matches the start of a file path:
+ *   C:\\  (Windows drive)
+ *   /    (Unix root)
+ *   a    (relative: letter, digit or dot)
+ */
+const pathStart = /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])/;
+
+/** Matches a path segment (directory or file name), allows spaces inside */
+const pathSegment = /[^\/\\\t\n\r\(\):]*[^\/\\\s\(\):]/;
+
+/** Matches a path segment, no spaces allowed */
+const strictPathSegment = /[^\/\\\s\(\):]+/;
+
+/** Matches directory separators: / or \ (one or more) */
+const dirSeparator = /[\/\\]+/;
 
 const tokenizers: Array<[RegExp, TokenFactory]> = [
     [
@@ -60,7 +110,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         } as any),
     ],
     [
-        /((?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)+([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        re("gi")`(${pathStart}(${pathSegment}${dirSeparator})+(${pathSegment}${fileExtension}))${lineAndColumn}`,
         (m: RegExpExecArray): TokenMeta => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[1] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -70,7 +120,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        /(\s*at\s)?(([^\/\\\t\n\r\(\):]*[^\/\\\s\(\):][\/\\]+)*([^\\\/\t\n\r\(\):]*[^\\\/\s\(\):]\.(c|h|[\d\w]{2,5})))((?:\??:(line )?(?<line1>\d+)(\:(?<col1>\d+))?)|(?:\((?<line2>\d+)(\,(?<col2>\d+))\)))/gi,
+        re("gi")`${/(\s*at\s)?/}((${pathSegment}${dirSeparator})*(${pathSegment}${fileExtension}))${lineAndColumn}`,
         m => {
             const result: any = { type: "FilePath", filePath: normalizeFilePath(m[2] ?? ""), line: Number(m.groups?.["line1"] ?? m.groups?.["line2"]) };
             if (m.groups?.["col1"] || m.groups?.["col2"]) {
@@ -94,7 +144,7 @@ const tokenizers: Array<[RegExp, TokenFactory]> = [
         },
     ],
     [
-        /(?:(?:\w\:\\{1,})|[\/\\]+|[\d\w\.])([^\/\\\s\(\):]+[\/\\]+)+([^\/\\\s\(\):]+\.(c|h|[\d\w]{2,5}))/gi,
+        re("gi")`${pathStart}(${strictPathSegment}${dirSeparator})+(${strictPathSegment}${fileExtension})`,
         m => ({ type: "FilePath", filePath: normalizeFilePath(m[0]) }),
     ],
     [
