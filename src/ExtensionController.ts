@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { StackTraceWebViewPanel } from "./webview/StackTraceWebViewPanel";
 import { Token } from "./TokenMeta";
 import { getPossibleFilePathsToSearch, splitIntoTokens } from "./stackTraceSplitter";
+import { preprocessJsonInText } from "./utils/jsonPreprocessor";
 
 type StackTraceInfo = {
     source: string;
@@ -52,7 +53,8 @@ export class ExtensionController {
             },
             async (progress, cancellationToken) => {
                 progress.report({ message: "Parsing stacktrace" });
-                stackTraceInfo.lines = splitIntoTokens(clipboardContent, (progressIncrementValue: number) => {
+                const preprocessedContent = preprocessJsonInText(clipboardContent);
+                stackTraceInfo.lines = splitIntoTokens(preprocessedContent, (progressIncrementValue: number) => {
                     progress.report({ increment: progressIncrementValue * 10 });
                 });
                 if (stackTraceInfo.lines) {
