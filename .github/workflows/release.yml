@@ -25,12 +25,20 @@ jobs:
             - run: npm install
 
             - name: Generate Changelog
-              run: npx conventional-changelog-cli -p angular -r 1 -o /tmp/release-notes.md
+              id: changelog
+              uses: TriPSs/conventional-changelog-action@v5
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  output-file: false
+                  skip-version-bump: true
+                  skip-git-pull: true
+                  skip-commit: true
+                  skip-tag: true
 
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  body_path: /tmp/release-notes.md
+                  body: ${{ steps.changelog.outputs.clean_changelog }}
 
             # - name: Install vsce
             #   run: npm install -g @vscode/vsce
