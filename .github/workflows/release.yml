@@ -4,13 +4,18 @@ on:
     push:
         tags:
             - "v*.*.*"
-        
+
+permissions:
+    contents: write
+
 jobs:
     publish:
         runs-on: ubuntu-latest
 
         steps:
             - uses: actions/checkout@v2
+              with:
+                  fetch-depth: 0
 
             - name: Use Node.js 20.x
               uses: actions/setup-node@v2
@@ -19,21 +24,29 @@ jobs:
 
             - run: npm install
 
-            - name: Install vsce
-              run: npm install -g @vscode/vsce
+            - name: Generate Changelog
+              run: npx conventional-changelog-cli -p angular -r 1 -o /tmp/release-notes.md
 
-            - name: Install ovsx
-              run: npm install -g ovsx
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  body_path: /tmp/release-notes.md
 
-            - name: Package Extension
-              run: vsce package --no-git-tag-version
+            # - name: Install vsce
+            #   run: npm install -g @vscode/vsce
 
-            - name: Publish to VS Marketplace
-              env:
-                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
-              run: vsce publish --no-git-tag-version --packagePath *.vsix
+            # - name: Install ovsx
+            #   run: npm install -g ovsx
 
-            - name: Publish to Open VSX Registry
-              env:
-                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
-              run: ovsx publish *.vsix
+            # - name: Package Extension
+            #   run: vsce package --no-git-tag-version
+
+            # - name: Publish to VS Marketplace
+            #   env:
+            #       VSCE_PAT: ${{ secrets.VSCE_PAT }}
+            #   run: vsce publish --no-git-tag-version --packagePath *.vsix
+
+            # - name: Publish to Open VSX Registry
+            #   env:
+            #       OVSX_PAT: ${{ secrets.OVSX_PAT }}
+            #   run: ovsx publish *.vsix
