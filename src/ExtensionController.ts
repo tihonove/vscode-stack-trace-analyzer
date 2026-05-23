@@ -66,25 +66,30 @@ export class ExtensionController {
                     stackTraceInfo.lines = await this.echrichWorkspacePathsInToken(
                         stackTraceInfo.lines,
                         cancellationToken,
-                        (progressIncrementValue: number) => progress.report({ increment: progressIncrementValue * 90 })
+                        (progressIncrementValue: number) => progress.report({ increment: progressIncrementValue * 90 }),
+                        (currentLines: Token[][]) => {
+                            stackTraceInfo.lines = currentLines;
+                            if (this.getCurrentStackTraceInfo() == stackTraceInfo) {
+                                this.showStackTraceTokensInWebView(currentLines);
+                            }
+                        }
                     );
                 }
                 this.storeStackTracesToWorkspaceState();
-
-                if (this.getCurrentStackTraceInfo() == stackTraceInfo && stackTraceInfo.lines) {
-                    this.showStackTraceTokensInWebView(stackTraceInfo.lines);
-                }
 
                 if (this.isVcsIntegrationEnabled && stackTraceInfo.lines) {
                     stackTraceInfo.lines = await this.enrichWorkspacePathsWithVscInfo(
                         stackTraceInfo.lines,
                         cancellationToken,
-                        (_: number) => {}
+                        (_: number) => {},
+                        (currentLines: Token[][]) => {
+                            stackTraceInfo.lines = currentLines;
+                            if (this.getCurrentStackTraceInfo() == stackTraceInfo) {
+                                this.showStackTraceTokensInWebView(currentLines);
+                            }
+                        }
                     );
                     this.storeStackTracesToWorkspaceState();
-                    if (this.getCurrentStackTraceInfo() == stackTraceInfo && stackTraceInfo.lines) {
-                        this.showStackTraceTokensInWebView(stackTraceInfo.lines);
-                    }
                 }
 
                 if (this.view == undefined) {
@@ -140,12 +145,14 @@ export class ExtensionController {
                         stackTrace.lines = await this.enrichWorkspacePathsWithVscInfo(
                             stackTrace.lines,
                             cancellationToken,
-                            (_: number) => {}
+                            (_: number) => {},
+                            (currentLines: Token[][]) => {
+                                stackTrace.lines = currentLines;
+                                if (this.getCurrentStackTraceInfo() == stackTrace) {
+                                    this.showStackTraceTokensInWebView(currentLines);
+                                }
+                            }
                         );
-                    }
-                    const currentStackTrace = this.getCurrentStackTraceInfo();
-                    if (currentStackTrace && currentStackTrace.lines) {
-                        this.showStackTraceTokensInWebView(currentStackTrace.lines);
                     }
                     this.storeStackTracesToWorkspaceState();
                 }
@@ -223,7 +230,8 @@ export class ExtensionController {
     private async enrichWorkspacePathsWithVscInfo(
         lines: Token[][],
         cancellationToken: vscode.CancellationToken,
-        _onProgress: (progress: number) => void
+        _onProgress: (progress: number) => void,
+        onLineResolved?: (currentLines: Token[][]) => void
     ): Promise<Token[][]> {
         try {
             if (cancellationToken.isCancellationRequested) {
@@ -245,10 +253,11 @@ export class ExtensionController {
                 return lines;
             }
 
-            return await Promise.all(
-                lines.map(async lineTokens => {
-                    return await Promise.all(
-                        lineTokens.map(async ([line, meta]) => {
+            const result: Token[][] = lines.map(l => [...l]);
+            await Promise.all(
+                lines.map(async (lineTokens, lineIndex): Promise<void> => {
+                    const resolvedLine = await Promise.all(
+                        lineTokens.map(async ([line, meta]): Promise<Token> => {
                             if (cancellationToken.isCancellationRequested) return [line];
                             if (meta == undefined) return [line];
                             if (meta.type === "FilePath" && meta.fileUriPath) {
@@ -277,8 +286,11 @@ export class ExtensionController {
                             return [line, meta];
                         })
                     );
+                    result[lineIndex] = resolvedLine;
+                    onLineResolved?.(result);
                 })
             );
+            return result;
         } catch (error) {
             return lines;
         }
@@ -287,7 +299,8 @@ export class ExtensionController {
     private async echrichWorkspacePathsInToken(
         lines: Token[][],
         cancellationToken: vscode.CancellationToken,
-        onProgress: (progress: number) => void
+        onProgress: (progress: number) => void,
+        onLineResolved?: (currentLines: Token[][]) => void
     ): Promise<Token[][]> {
         let totalFilePathTokens = 0;
         for (const lineTokens of lines) {
@@ -298,9 +311,10 @@ export class ExtensionController {
             }
         }
 
-        return await Promise.all(
-            lines.map(async (lineTokens): Promise<Token[]> => {
-                return await Promise.all(
+        const result: Token[][] = lines.map(l => l.map(([t]) => [t]));
+        await Promise.all(
+            lines.map(async (lineTokens, lineIndex): Promise<void> => {
+                const resolvedLine = await Promise.all(
                     lineTokens.map(async ([line, meta]): Promise<Token> => {
                         if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
                         if (meta.type === "FilePath") {
@@ -341,8 +355,11 @@ export class ExtensionController {
                         return [line];
                     })
                 );
+                result[lineIndex] = resolvedLine;
+                onLineResolved?.(result);
             })
         );
+        return result;
     }
 
     private removeVcsInfoFromLines(lines: Token[][]): Token[][] {
