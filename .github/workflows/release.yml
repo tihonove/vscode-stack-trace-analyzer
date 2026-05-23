@@ -25,20 +25,15 @@ jobs:
             - run: npm install
 
             - name: Generate Changelog
-              id: changelog
-              uses: TriPSs/conventional-changelog-action@v5
+              id: cliff
+              uses: orhun/git-cliff-action@v4
               with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-                  output-file: false
-                  skip-version-bump: true
-                  skip-git-pull: true
-                  skip-commit: true
-                  skip-tag: true
+                  args: --latest --strip all
 
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  body: ${{ steps.changelog.outputs.clean_changelog }}
+                  body: ${{ steps.cliff.outputs.content }}
 
             # - name: Install vsce
             #   run: npm install -g @vscode/vsce
