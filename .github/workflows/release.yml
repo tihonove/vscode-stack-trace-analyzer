@@ -4,13 +4,18 @@ on:
     push:
         tags:
             - "v*.*.*"
-        
+
+permissions:
+    contents: write
+
 jobs:
     publish:
         runs-on: ubuntu-latest
 
         steps:
             - uses: actions/checkout@v2
+              with:
+                  fetch-depth: 0
 
             - name: Use Node.js 20.x
               uses: actions/setup-node@v2
@@ -18,6 +23,18 @@ jobs:
                   node-version: 20.x
 
             - run: npm install
+
+            - name: Generate Changelog
+              id: cliff
+              uses: orhun/git-cliff-action@v4
+              with:
+                  args: --latest --strip all
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  name: Stack trace analyzer ${{ github.ref_name }}
+                  body: ${{ steps.cliff.outputs.content }}
 
             - name: Install vsce
               run: npm install -g @vscode/vsce
