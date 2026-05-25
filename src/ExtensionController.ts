@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { StackTraceWebViewPanel } from "./webview/StackTraceWebViewPanel";
 import { Token } from "./TokenMeta";
-import { getPossibleFilePathsToSearch, splitIntoTokens } from "./stackTraceSplitter";
+import { splitIntoTokens } from "./stackTraceSplitter";
+import { enrichTokensWithWorkspacePaths, VscodeWorkspaceFileSearcher } from "./workspaceFileResolver";
+import { createDeltaProgressTracker } from "./utils/progressTracker";
 import { preprocessJsonInText } from "./utils/jsonPreprocessor";
 
 type StackTraceInfo = {
@@ -63,10 +65,14 @@ export class ExtensionController {
 
                 progress.report({ message: "Searching files" });
                 if (stackTraceInfo.lines) {
-                    stackTraceInfo.lines = await this.echrichWorkspacePathsInToken(
+                    const searchProgress = createDeltaProgressTracker(
+                        delta => progress.report({ increment: delta * 90 })
+                    );
+                    stackTraceInfo.lines = await enrichTokensWithWorkspacePaths(
                         stackTraceInfo.lines,
+                        new VscodeWorkspaceFileSearcher(),
                         cancellationToken,
-                        (progressIncrementValue: number) => progress.report({ increment: progressIncrementValue * 90 }),
+                        searchProgress,
                         (currentLines: Token[][]) => {
                             stackTraceInfo.lines = currentLines;
                             if (this.getCurrentStackTraceInfo() == stackTraceInfo) {
@@ -294,72 +300,6 @@ export class ExtensionController {
         } catch (error) {
             return lines;
         }
-    }
-
-    private async echrichWorkspacePathsInToken(
-        lines: Token[][],
-        cancellationToken: vscode.CancellationToken,
-        onProgress: (progress: number) => void,
-        onLineResolved?: (currentLines: Token[][]) => void
-    ): Promise<Token[][]> {
-        let totalFilePathTokens = 0;
-        for (const lineTokens of lines) {
-            for (const [_, meta] of lineTokens) {
-                if (meta && meta.type === "FilePath") {
-                    totalFilePathTokens += 1;
-                }
-            }
-        }
-
-        const result: Token[][] = lines.map(l => l.map(([t]) => [t]));
-        await Promise.all(
-            lines.map(async (lineTokens, lineIndex): Promise<void> => {
-                const resolvedLine = await Promise.all(
-                    lineTokens.map(async ([line, meta]): Promise<Token> => {
-                        if (meta == undefined || cancellationToken.isCancellationRequested) return [line];
-                        if (meta.type === "FilePath") {
-                            const { filePath, ...tokenMeta } = meta;
-                            for (const possibleFilePath of getPossibleFilePathsToSearch(filePath)) {
-                                const uris1 = await vscode.workspace.findFiles(
-                                    possibleFilePath,
-                                    null,
-                                    1,
-                                    cancellationToken
-                                );
-                                if (uris1.length > 0) {
-                                    if (onProgress && totalFilePathTokens > 0) {
-                                        onProgress(1 / totalFilePathTokens);
-                                    }
-                                    return [line, { ...tokenMeta, fileUriPath: uris1[0]?.path ?? "" }];
-                                } else {
-                                    const uris2 = await vscode.workspace.findFiles(
-                                        "**/*/" + possibleFilePath,
-                                        "**/node_modules/**",
-                                        1,
-                                        cancellationToken
-                                    );
-                                    if (uris2.length > 0) {
-                                        if (onProgress && totalFilePathTokens > 0) {
-                                            onProgress(1 / totalFilePathTokens);
-                                        }
-                                        return [line, { ...tokenMeta, fileUriPath: uris2[0]?.path ?? "" }];
-                                    }
-                                }
-                            }
-                            if (onProgress && totalFilePathTokens > 0) {
-                                onProgress(1 / totalFilePathTokens);
-                            }
-                        } else if (meta.type === "Symbol") {
-                            return [line, { ...meta }];
-                        }
-                        return [line];
-                    })
-                );
-                result[lineIndex] = resolvedLine;
-                onLineResolved?.(result);
-            })
-        );
-        return result;
     }
 
     private removeVcsInfoFromLines(lines: Token[][]): Token[][] {
