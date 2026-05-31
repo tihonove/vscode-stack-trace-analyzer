@@ -114,9 +114,15 @@ Reusable building blocks for composing tokenizers:
 - `lineAndColumn` — `:123:45`, `(123)`, `?:line 123`, etc.
 - `re` — tagged template function for composing regexes from primitives
 
-### `getPossibleFilePathsToSearch`
+### File path resolution (`workspaceFileResolver.ts`)
 
-For a path `a/b/c/file.ts` generates `a/b/c/file.ts`, `b/c/file.ts`, `c/file.ts`, `file.ts` — used to find a file in the workspace when the stack trace contains a partial path.
+`VscodeWorkspaceFileSearcher` resolves a `filePath` from a token to an absolute URI in the workspace. The search strategy, in order:
+
+1. **Smart candidates** (`computeSmartCandidatePaths`) — looks for a workspace folder's on-disk directory name among the path segments. If found, constructs the URI directly with `vscode.Uri.joinPath(folder.uri, suffix)` and checks existence via `workspace.fs.stat()` — a single fast call, no glob search. Example: workspace folder `my-repo` at `/home/user/my-repo`, path `C:/BuildAgent/work/hash/my-repo/src/Utils/Helper.cs` → stats `/home/user/my-repo/src/Utils/Helper.cs` directly.
+
+2. **All suffix candidates** (`getPossibleFilePathsToSearch`) — fallback. For `a/b/c/file.ts` generates `a/b/c/file.ts`, `b/c/file.ts`, `c/file.ts`, `file.ts` and tries each in order. For each candidate, two `workspace.findFiles()` calls are made: an exact match, then a wildcard-prefix match (`**/*/<candidate>`).
+
+`computeSmartCandidatePaths` lives in `workspaceFileResolver.ts` — takes `filePath` and workspace folders, then returns candidate `vscode.Uri` values built with `vscode.Uri.joinPath()`. Tested in `src/test/computeSmartCandidatePaths.test.ts`.
 
 ---
 
