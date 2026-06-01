@@ -132,7 +132,7 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc; copyfiles --flat src/webview/client/*.css out/webview/client",
+		"build": "tsc && copyfiles --flat src/webview/client/*.css out/webview/client",
 		"test": "vitest run",
 		"vscode:prepublish": "npm run build"
 	},
