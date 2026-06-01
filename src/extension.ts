@@ -9,6 +9,8 @@ export function activate(context: vscode.ExtensionContext) {
         resolveWebviewView: (webviewView: vscode.WebviewView) => {
             controller.setWebView(webviewView);
         },
+    }, {
+        webviewOptions: { retainContextWhenHidden: true },
     }));
     
     controller.init();
