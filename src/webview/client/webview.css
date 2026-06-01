@@ -3,8 +3,20 @@
     white-space: pre-wrap;
 }
 
+.file-path {
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.file-path:hover {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
 .symbol {
     color: inherit;
+    cursor: pointer;
     text-decoration: none;
 }
 

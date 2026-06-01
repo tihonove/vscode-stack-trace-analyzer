@@ -90,8 +90,8 @@ function showLines(lines: Token[][]) {
             let tokenElement;
             if (token[1]?.type == "FilePath") {
                 tokenElement = document.createElement("a");
+                tokenElement.classList.add("file-path");
                 tokenElement.innerText = tokenText;
-                tokenElement.href = "#";
 
                 const lastCommit = token[1]?.vcsInfo?.lastChangeCommit;
                 if (lastCommit && lastCommit.authorDate) {
@@ -118,7 +118,6 @@ function showLines(lines: Token[][]) {
                 tokenElement = document.createElement("a");
                 tokenElement.classList.add("symbol");
                 tokenElement.innerText = tokenText;
-                tokenElement.href = "#";
                 tokenElement.onclick = event => {
                     vscode.postMessage({
                         type: "GoToSymbol",
