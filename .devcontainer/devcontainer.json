@@ -8,7 +8,10 @@
 			]
 		}
 	},
-	"postCreateCommand": "npm install -g @vscode/vsce prettier @anthropic-ai/claude-code && npm install && echo 'Development environment ready!'",
+	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y kitty-terminfo locales && sudo locale-gen en_US.UTF-8 && npm install -g @vscode/vsce prettier @anthropic-ai/claude-code && npm install && echo 'Development environment ready!'",
+	"containerEnv": {
+		"LANG": "en_US.UTF-8"
+	},
 	"remoteUser": "node",
 	"mounts": [
 		"source=${localWorkspaceFolder}/.git,target=/workspaces/${localWorkspaceFolderBasename}/.git,type=bind,consistency=cached"
