@@ -1,11 +1,6 @@
 {
 	"name": "Stack Trace Analyzer Development",
-	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-	"features": {
-		"ghcr.io/devcontainers/features/node:1": {
-			"version": "22"
-		}
-	},
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:22",
 	"customizations": {
 		"vscode": {
 			"extensions": [
