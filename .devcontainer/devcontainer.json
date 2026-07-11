@@ -9,7 +9,7 @@
 		}
 	},
 	"postCreateCommand": "npm install -g @vscode/vsce prettier && npm install && echo 'Development environment ready!'",
-	"remoteUser": "vscode",
+	"remoteUser": "node",
 	"mounts": [
 		"source=${localWorkspaceFolder}/.git,target=/workspaces/${localWorkspaceFolderBasename}/.git,type=bind,consistency=cached"
 	]
