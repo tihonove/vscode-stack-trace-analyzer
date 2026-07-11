@@ -2,7 +2,10 @@
 	"name": "Stack Trace Analyzer Development",
 	"image": "mcr.microsoft.com/devcontainers/javascript-node:24",
 	"features": {
-		"ghcr.io/devcontainers/features/github-cli:1": {}
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "25"
+		}
 	},
 	"customizations": {
 		"vscode": {
