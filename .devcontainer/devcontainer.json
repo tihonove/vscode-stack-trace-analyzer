@@ -8,7 +8,7 @@
 			]
 		}
 	},
-	"postCreateCommand": "npm install -g @vscode/vsce prettier && npm install && echo 'Development environment ready!'",
+	"postCreateCommand": "npm install -g @vscode/vsce prettier @anthropic-ai/claude-code && npm install && echo 'Development environment ready!'",
 	"remoteUser": "node",
 	"mounts": [
 		"source=${localWorkspaceFolder}/.git,target=/workspaces/${localWorkspaceFolderBasename}/.git,type=bind,consistency=cached"
