@@ -132,13 +132,13 @@ Reusable building blocks for composing tokenizers:
 
 #### Fast searcher (opt-in)
 
-On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`, selected by `createFileSearcher()` (`fileSearcherFactory.ts`) via `stack-trace-analyzer.searchMode`:
+On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`, selected by `createFileSearcher()` (`fileSearcherFactory.ts`) from the `stack-trace-analyzer.search.*` feature flags (the highest-priority enabled one wins; the legacy `VscodeWorkspaceFileSearcher` is the base fallback when none is set):
 
-- **`vscode`** (default for now) — the legacy `VscodeWorkspaceFileSearcher`.
-- **`gitIndex`** — the fast resolver, git index first.
-- **`filesystem`** — the fast resolver, filesystem walk only (never invokes git).
+- **`search.gitIndex`** — the fast resolver, git index first.
+- **`search.filesystem`** — the fast resolver, filesystem walk only (never invokes git).
+- *(future: `search.native`, slotting in as another flag ordered fastest-first.)*
 
-`createFileSearcher()` is called per analysis, so a mode change takes effect without reloading the window. All frames resolve in one batch (`FileSearcher.findFiles`, consumed by `enrichTokensWithWorkspacePaths` after de-duplicating paths). Per unresolved frame the resolver walks a chain, keeping whatever an earlier step found:
+`createFileSearcher()` is called per analysis, so a flag change takes effect without reloading the window. All frames resolve in one batch (`FileSearcher.findFiles`, consumed by `enrichTokensWithWorkspacePaths` after de-duplicating paths). Per unresolved frame the resolver walks a chain, keeping whatever an earlier step found:
 
 1. **Smart candidate** — a direct `stat` (`pathMatch.computeSmartCandidatePathsPure`).
 2. **Targeted git query** (`gitIndex` mode) — one `git ls-files -z --cached --others --exclude-standard -- :(icase)*<basename>…` per root. git filters by basename on its side (streamed, NUL-split), so memory stays tiny and `.gitignore` is honored for free. Because it just runs `git -C <root>`, it transparently handles worktrees (a `.git` file, not a directory) and roots at any depth relative to the repo top; a root that is not a repo (git exit 128) or has no git falls through to the walk.

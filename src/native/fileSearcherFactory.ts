@@ -3,23 +3,29 @@ import { FileSearcher, VscodeWorkspaceFileSearcher } from "../workspaceFileResol
 import { IProgressReporter } from "../utils/progressTracker";
 import { IndexedFileSearcher } from "./indexedFileSearcher";
 
-export type SearchMode = "gitIndex" | "filesystem" | "vscode";
-
 /**
- * Builds the file searcher used by the extension, per `stack-trace-analyzer.searchMode`:
- * - `vscode`     — the original `VscodeWorkspaceFileSearcher`.
- * - `gitIndex`   — the fast indexed searcher using `git ls-files` (walk fallback).
- * - `filesystem` — the fast indexed searcher, always scanning the filesystem.
+ * Builds the file searcher used by the extension from the `stack-trace-analyzer.search.*`
+ * feature flags. The enabled method with the highest priority wins; VS Code's
+ * `VscodeWorkspaceFileSearcher` is the base fallback when no flag is set. New
+ * strategies (e.g. a future `search.native`) slot in as another flag + branch,
+ * ordered fastest/preferred first.
  *
- * The indexed modes return a composite that transparently falls back to
+ * The fast methods are wrapped in a composite that transparently falls back to
  * `VscodeWorkspaceFileSearcher` if the fast path throws, so a resolver hiccup
  * never breaks stack-trace analysis.
  */
 export function createFileSearcher(): FileSearcher {
+    const config = vscode.workspace.getConfiguration("stack-trace-analyzer");
     const fallback = new VscodeWorkspaceFileSearcher();
-    const mode = vscode.workspace.getConfiguration("stack-trace-analyzer").get<SearchMode>("searchMode", "vscode");
-    if (mode === "vscode") return fallback;
-    return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: mode !== "filesystem" }), fallback);
+
+    // Priority order, fastest/preferred first. (Future: config.get("search.native").)
+    if (config.get<boolean>("search.gitIndex", false)) {
+        return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: true }), fallback);
+    }
+    if (config.get<boolean>("search.filesystem", false)) {
+        return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: false }), fallback);
+    }
+    return fallback;
 }
 
 class CompositeFileSearcher implements FileSearcher {
