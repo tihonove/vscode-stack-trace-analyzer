@@ -18,12 +18,9 @@ export function createFileSearcher(): FileSearcher {
     const config = vscode.workspace.getConfiguration("stack-trace-analyzer");
     const fallback = new VscodeWorkspaceFileSearcher();
 
-    // Priority order, fastest/preferred first. (Future: config.get("search.native").)
+    // Priority order, fastest/preferred first. (Future: search.native, search.filesystem.)
     if (config.get<boolean>("search.gitIndex", false)) {
         return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: true }), fallback);
-    }
-    if (config.get<boolean>("search.filesystem", false)) {
-        return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: false }), fallback);
     }
     return fallback;
 }

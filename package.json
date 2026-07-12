@@ -47,12 +47,7 @@
 				"stack-trace-analyzer.search.gitIndex": {
 					"type": "boolean",
 					"default": false,
-					"markdownDescription": "Resolve stack-trace file paths using the git index (`git ls-files`) — usually the fastest option on large repos and it honors `.gitignore`. Falls back to a filesystem scan for non-git roots and for anything git misses, and to VS Code's workspace search if git crashes. Takes priority over `#stack-trace-analyzer.search.filesystem#`. When all `stack-trace-analyzer.search.*` methods are off, VS Code's built-in workspace search is used."
-				},
-				"stack-trace-analyzer.search.filesystem": {
-					"type": "boolean",
-					"default": false,
-					"markdownDescription": "Resolve stack-trace file paths by scanning the filesystem directly (never invokes git). Used when `#stack-trace-analyzer.search.gitIndex#` is off. When all `stack-trace-analyzer.search.*` methods are off, VS Code's built-in workspace search is used."
+					"markdownDescription": "Resolve stack-trace file paths using the git index (`git ls-files`) — usually the fastest option on large repos and it honors `.gitignore`. Falls back to a filesystem scan for non-git roots and for anything git misses, and to VS Code's workspace search if git crashes. When off, VS Code's built-in workspace search is used."
 				}
 			}
 		},

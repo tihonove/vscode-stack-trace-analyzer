@@ -134,9 +134,8 @@ Reusable building blocks for composing tokenizers:
 
 On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`, selected by `createFileSearcher()` (`fileSearcherFactory.ts`) from the `stack-trace-analyzer.search.*` feature flags (the highest-priority enabled one wins; the legacy `VscodeWorkspaceFileSearcher` is the base fallback when none is set):
 
-- **`search.gitIndex`** — the fast resolver, git index first.
-- **`search.filesystem`** — the fast resolver, filesystem walk only (never invokes git).
-- *(future: `search.native`, slotting in as another flag ordered fastest-first.)*
+- **`search.gitIndex`** — the fast resolver, git index first (with a filesystem-walk fallback internally).
+- *(future: `search.native`, `search.filesystem`, slotting in as more flags ordered fastest-first.)*
 
 `createFileSearcher()` is called per analysis, so a flag change takes effect without reloading the window. All frames resolve in one batch (`FileSearcher.findFiles`, consumed by `enrichTokensWithWorkspacePaths` after de-duplicating paths). Per unresolved frame the resolver walks a chain, keeping whatever an earlier step found:
 
