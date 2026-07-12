@@ -5,6 +5,17 @@ import { IProgressReporter, ProgressSplitter } from "./utils/progressTracker";
 
 export interface FileSearcher {
     findFile(filePath: string, cancellationToken: vscode.CancellationToken, progress: IProgressReporter): Promise<string | undefined>;
+    /**
+     * Optional batch resolution: resolve many file paths in one round-trip.
+     * When present, `enrichTokensWithWorkspacePaths` prefers it over per-token
+     * `findFile` (fewer traversals, cross-frame dedup). Returns a map keyed by
+     * the input file paths (undefined = not found).
+     */
+    findFiles?(
+        filePaths: string[],
+        cancellationToken: vscode.CancellationToken,
+        progress: IProgressReporter
+    ): Promise<Map<string, string | undefined>>;
 }
 
 export class VscodeWorkspaceFileSearcher implements FileSearcher {
@@ -93,6 +104,10 @@ export async function enrichTokensWithWorkspacePaths(
     progress: IProgressReporter,
     onLineResolved?: (currentLines: Token[][]) => void
 ): Promise<Token[][]> {
+    if (fileSearcher.findFiles != undefined) {
+        return enrichTokensBatched(lines, fileSearcher.findFiles.bind(fileSearcher), cancellationToken, progress, onLineResolved);
+    }
+
     const result: Token[][] = lines.map(l => l.map(([t]) => [t]));
     const splitter = new ProgressSplitter(progress);
     await Promise.all(
@@ -118,5 +133,54 @@ export async function enrichTokensWithWorkspacePaths(
             onLineResolved?.(result);
         })
     );
+    return result;
+}
+
+/**
+ * Batch variant used when the searcher exposes `findFiles`: collect every
+ * distinct file path across all lines, resolve them in a single round-trip
+ * (cross-frame dedup), then map the results back onto the tokens.
+ */
+async function enrichTokensBatched(
+    lines: Token[][],
+    findFiles: NonNullable<FileSearcher["findFiles"]>,
+    cancellationToken: vscode.CancellationToken,
+    progress: IProgressReporter,
+    onLineResolved?: (currentLines: Token[][]) => void
+): Promise<Token[][]> {
+    const result: Token[][] = lines.map(l => l.map(([t]) => [t]));
+
+    type FilePathSlot = { lineIndex: number; tokenIndex: number; line: string; filePath: string; tokenMeta: object };
+    const filePathSlots: FilePathSlot[] = [];
+    lines.forEach((lineTokens, lineIndex) => {
+        lineTokens.forEach(([line, meta], tokenIndex) => {
+            if (meta == undefined) return;
+            if (meta.type === "FilePath") {
+                const { filePath, ...tokenMeta } = meta;
+                filePathSlots.push({ lineIndex, tokenIndex, line, filePath, tokenMeta });
+            } else if (meta.type === "Symbol") {
+                result[lineIndex]![tokenIndex] = [line, { ...meta }];
+            }
+        });
+    });
+
+    if (cancellationToken.isCancellationRequested || filePathSlots.length === 0) {
+        progress.complete();
+        onLineResolved?.(result);
+        return result;
+    }
+
+    const distinctFilePaths = [...new Set(filePathSlots.map(slot => slot.filePath))];
+    const resolved = await findFiles(distinctFilePaths, cancellationToken, progress);
+
+    for (const slot of filePathSlots) {
+        const fileUriPath = resolved.get(slot.filePath);
+        if (fileUriPath != undefined) {
+            result[slot.lineIndex]![slot.tokenIndex] = [slot.line, { ...slot.tokenMeta, type: "FilePath", fileUriPath } as any];
+        }
+    }
+
+    progress.complete();
+    onLineResolved?.(result);
     return result;
 }

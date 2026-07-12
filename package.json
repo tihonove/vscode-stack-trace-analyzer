@@ -41,6 +41,22 @@
 		"LICENSE.md"
 	],
 	"contributes": {
+		"configuration": {
+			"title": "Stack Trace Analyzer",
+			"properties": {
+				"stack-trace-analyzer.searchMode": {
+					"type": "string",
+					"default": "vscode",
+					"enum": ["vscode", "gitIndex", "filesystem"],
+					"markdownEnumDescriptions": [
+						"Use VS Code's built-in workspace search (`workspace.findFiles`). The default for now.",
+						"Use the git index (`git ls-files`) as the primary file source in git repositories — usually the fastest option and it honors `.gitignore`. Falls back to a filesystem scan for non-git roots and for anything git misses, and to `vscode` search if git crashes.",
+						"Scan the filesystem directly for matching files. Works everywhere, never invokes git."
+					],
+					"description": "How stack-trace file paths are resolved to workspace files."
+				}
+			}
+		},
 		"viewsContainers": {
 			"panel": [
 				{

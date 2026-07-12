@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 import { StackTraceWebViewPanel } from "./webview/StackTraceWebViewPanel";
 import { Token } from "./TokenMeta";
 import { splitIntoTokens } from "./stackTraceSplitter";
-import { enrichTokensWithWorkspacePaths, VscodeWorkspaceFileSearcher } from "./workspaceFileResolver";
+import { enrichTokensWithWorkspacePaths } from "./workspaceFileResolver";
+import { createFileSearcher } from "./native/fileSearcherFactory";
 import { createDeltaProgressTracker } from "./utils/progressTracker";
 import { preprocessJsonInText } from "./utils/jsonPreprocessor";
 
@@ -70,7 +71,7 @@ export class ExtensionController {
                     );
                     stackTraceInfo.lines = await enrichTokensWithWorkspacePaths(
                         stackTraceInfo.lines,
-                        new VscodeWorkspaceFileSearcher(),
+                        createFileSearcher(),
                         cancellationToken,
                         searchProgress,
                         (currentLines: Token[][]) => {

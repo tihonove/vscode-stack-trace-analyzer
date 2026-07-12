@@ -3,7 +3,7 @@
     "target": "ES2020",
     "module": "CommonJS",
     "lib": ["ES2020", "DOM"],
-    "types": ["vitest/globals", "vscode-webview"],
+    "types": ["node", "vitest/globals", "vscode-webview"],
     "outDir": "./out",
     "rootDir": "./src",
     "strict": true,
@@ -36,5 +36,6 @@
   "exclude": [
     "node_modules",
     "out",
+    "src/test/fixtures",
   ]
 }

@@ -1,0 +1,8 @@
+System.Exception: boom
+   at SampleRepo.Utils.Helper.DoWork() in C:\BuildAgent\work\abc\sample-repo\src\Utils\Helper.cs:line 42
+    at Handle (src/api/handlers/order_handler.go:88:1)
+    at parse (src/lib/parser.py:15:3)
+    at Button (src/components/button.jsx:2:9)
+    at Passes (Utils/Helper.cs:5:1)
+    at Gen (generated/Gen.cs:1:1)
+    at Ghost (nonexistent/Ghost.cs:99:1)

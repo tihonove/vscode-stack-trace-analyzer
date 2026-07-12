@@ -12,6 +12,12 @@ src/
 ├── ExtensionController.ts        — main state and logic controller
 ├── stackTraceSplitter.ts         — parses stack trace text into tokens
 ├── TokenMeta.ts                  — Token, TokenMeta, CommitInfo types
+├── native/                       — fast, vscode-free file resolver core + adapters
+│   ├── pathMatch.ts              — pure smart-candidate + suffix matching (testable)
+│   ├── fsWalk.ts                 — bounded-concurrency directory walk by basename
+│   ├── candidateResolver.ts      — git ls-files / walk → resolveFilePaths() (vscode-free)
+│   ├── indexedFileSearcher.ts    — FileSearcher adapter (reads workspaceFolders)
+│   └── fileSearcherFactory.ts    — composite fast+fallback searcher, config-gated
 ├── utils/
 │   ├── asyncUtils.ts             — delay()
 │   ├── commontUtils.ts           — intersperse(), regexMatchCount()
@@ -123,6 +129,22 @@ Reusable building blocks for composing tokenizers:
 2. **All suffix candidates** (`getPossibleFilePathsToSearch`) — fallback. For `a/b/c/file.ts` generates `a/b/c/file.ts`, `b/c/file.ts`, `c/file.ts`, `file.ts` and tries each in order. For each candidate, two `workspace.findFiles()` calls are made: an exact match, then a wildcard-prefix match (`**/*/<candidate>`).
 
 `computeSmartCandidatePaths` lives in `workspaceFileResolver.ts` — takes `filePath` and workspace folders, then returns candidate `vscode.Uri` values built with `vscode.Uri.joinPath()`. Tested in `src/test/computeSmartCandidatePaths.test.ts`.
+
+#### Fast searcher (opt-in)
+
+On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`, selected by `createFileSearcher()` (`fileSearcherFactory.ts`) via `stack-trace-analyzer.searchMode`:
+
+- **`vscode`** (default for now) — the legacy `VscodeWorkspaceFileSearcher`.
+- **`gitIndex`** — the fast resolver, git index first.
+- **`filesystem`** — the fast resolver, filesystem walk only (never invokes git).
+
+`createFileSearcher()` is called per analysis, so a mode change takes effect without reloading the window. All frames resolve in one batch (`FileSearcher.findFiles`, consumed by `enrichTokensWithWorkspacePaths` after de-duplicating paths). Per unresolved frame the resolver walks a chain, keeping whatever an earlier step found:
+
+1. **Smart candidate** — a direct `stat` (`pathMatch.computeSmartCandidatePathsPure`).
+2. **Targeted git query** (`gitIndex` mode) — one `git ls-files -z --cached --others --exclude-standard -- :(icase)*<basename>…` per root. git filters by basename on its side (streamed, NUL-split), so memory stays tiny and `.gitignore` is honored for free. Because it just runs `git -C <root>`, it transparently handles worktrees (a `.git` file, not a directory) and roots at any depth relative to the repo top; a root that is not a repo (git exit 128) or has no git falls through to the walk.
+3. **Filesystem walk** — for non-git roots, for `filesystem` mode, and for anything git served but did **not** contain (nested repos, submodules, git-ignored generated files), `fsWalk.walkForBasenames` scans the git-served roots for the still-missing basenames.
+
+Candidates are ranked by longest matching path suffix (`pathMatch.matchCandidate`), then the winner is `stat`-validated (handles sparse-checkout). If **git crashes** (killed, unexpected exit, spawn error — as opposed to "not a repo"), the resolver throws `GitSearchError` and the composite in `fileSearcherFactory.ts` falls the whole request back to `VscodeWorkspaceFileSearcher`. The core (`pathMatch`, `fsWalk`, `candidateResolver`) imports no `vscode`, so it is unit-tested directly against a real git fixture in `src/test/nativeFileSearch.test.ts` (fixtures under `src/test/fixtures/sample-repo/`).
 
 ---
 
