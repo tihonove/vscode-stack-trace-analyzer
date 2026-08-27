@@ -13,9 +13,12 @@ src/
 ├── stackTraceSplitter.ts         — parses stack trace text into tokens
 ├── TokenMeta.ts                  — Token, TokenMeta, CommitInfo types
 ├── native/                       — fast, vscode-free file resolver core + adapters
-│   ├── pathMatch.ts              — pure smart-candidate + suffix matching (testable)
+│   ├── pathMatch.ts              — pure smart-candidate + suffix matching/ranking (testable)
 │   ├── fsWalk.ts                 — bounded-concurrency directory walk by basename
-│   ├── candidateResolver.ts      — git ls-files / walk → resolveFilePaths() (vscode-free)
+│   ├── gitCli.ts                 — `git` CLI wrappers: rev-parse, ls-files, ignored entries
+│   ├── searchScopes.ts           — workspace folders → plan of git / walk scopes
+│   ├── candidateResolver.ts      — the resolution ladder → resolveFilePaths() (vscode-free)
+│   ├── vscodeGitRepos.ts         — repository roots from the `vscode.git` API
 │   ├── indexedFileSearcher.ts    — FileSearcher adapter (reads workspaceFolders)
 │   └── fileSearcherFactory.ts    — composite fast+fallback searcher, config-gated
 ├── utils/
@@ -132,18 +135,75 @@ Reusable building blocks for composing tokenizers:
 
 #### Fast searcher (opt-in)
 
-On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`, selected by `createFileSearcher()` (`fileSearcherFactory.ts`) from the `stack-trace-analyzer.search.*` feature flags (the highest-priority enabled one wins; the legacy `VscodeWorkspaceFileSearcher` is the base fallback when none is set):
+On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix
+candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`,
+selected by `createFileSearcher()` (`fileSearcherFactory.ts`) from the `stack-trace-analyzer.search.*`
+feature flags (the highest-priority enabled one wins; the legacy `VscodeWorkspaceFileSearcher` is the
+base fallback when none is set):
 
-- **`search.gitIndex`** — the fast resolver, git index first (with a filesystem-walk fallback internally).
+- **`search.gitIndex`** — the fast resolver, git first (with filesystem-walk fallbacks internally).
 - *(future: `search.native`, `search.filesystem`, slotting in as more flags ordered fastest-first.)*
 
-`createFileSearcher()` is called per analysis, so a flag change takes effect without reloading the window. All frames resolve in one batch (`FileSearcher.findFiles`, consumed by `enrichTokensWithWorkspacePaths` after de-duplicating paths). Per unresolved frame the resolver walks a chain, keeping whatever an earlier step found:
+`createFileSearcher()` is called per analysis, so a flag change takes effect without reloading the
+window. All frames resolve in one batch (`FileSearcher.findFiles`, consumed by
+`enrichTokensWithWorkspacePaths` after de-duplicating paths).
 
-1. **Smart candidate** — a direct `stat` (`pathMatch.computeSmartCandidatePathsPure`).
-2. **Targeted git query** (`gitIndex` mode) — one `git ls-files -z --cached --others --exclude-standard -- :(icase)*<basename>…` per root. git filters by basename on its side (streamed, NUL-split), so memory stays tiny and `.gitignore` is honored for free. Because it just runs `git -C <root>`, it transparently handles worktrees (a `.git` file, not a directory) and roots at any depth relative to the repo top; a root that is not a repo (git exit 128) or has no git falls through to the walk.
-3. **Filesystem walk** — for non-git roots, for `filesystem` mode, and for anything git served but did **not** contain (nested repos, submodules, git-ignored generated files), `fsWalk.walkForBasenames` scans the git-served roots for the still-missing basenames.
+##### Search scopes (`searchScopes.ts`)
 
-Candidates are ranked by longest matching path suffix (`pathMatch.matchCandidate`), then the winner is `stat`-validated (handles sparse-checkout). If **git crashes** (killed, unexpected exit, spawn error — as opposed to "not a repo"), the resolver throws `GitSearchError` and the composite in `fileSearcherFactory.ts` falls the whole request back to `VscodeWorkspaceFileSearcher`. The core (`pathMatch`, `fsWalk`, `candidateResolver`) imports no `vscode`, so it is unit-tested directly against a real git fixture in `src/test/nativeFileSearch.test.ts` (fixtures under `src/test/fixtures/sample-repo/`).
+The resolver never assumes "one workspace folder == one git repository" — that assumption used to
+collapse into a full filesystem walk in two very common layouts:
+
+- a folder holding **several repositories** (and repositories **nested** inside a workspace folder:
+  `git ls-files` never descends into another repository), and
+- a workspace folder that is only a **subdirectory of one big repository** (`git ls-files` run from a
+  subdirectory only ever reports that subtree).
+
+`planSearchScopes()` turns the workspace folders into a list of scopes, each either **git** (`dir` to
+query, plus the `repoTop` of its repository) or **walk** (`dir` plus `excludeDirs` carved out because a
+git scope covers them). Per workspace folder it:
+
+1. finds the enclosing repository — first among the roots the host already knows
+   (`vscodeGitRepos.getKnownRepoRoots()`, i.e. `vscode.git`'s `api.repositories`), otherwise one
+   `git rev-parse --show-toplevel` call;
+2. probes the folder's immediate subdirectories for `.git` (depth 1, matching VS Code's default
+   `git.repositoryScanMaxDepth`) as a safety net for containers and submodules when the git extension
+   reported nothing — one `readdir` plus a `stat` per subdirectory;
+3. emits a git scope for the folder itself (when it is inside a repository) plus one per contained
+   repository, or — when nothing encloses it — git scopes for the contained repositories and a single
+   walk scope for the remainder.
+
+##### The resolution ladder (`candidateResolver.ts`)
+
+`resolveFilePaths()` climbs four rungs, each running **only for the frames still unresolved**, so the
+expensive rungs see a shrinking set of basenames:
+
+1. **Smart candidate** — a direct `stat` (`pathMatch.computeSmartCandidatePathsPure`). Anchors are the
+   workspace folders *and* the repository tops, since a build-agent path carries the repo's directory name.
+2. **Primary pass over the scopes** (bounded concurrency): git scopes get
+   `git ls-files -z --cached --others --exclude-standard -- :(icase)*<basename>…` (git filters by
+   basename on its side, streamed and NUL-split, `.gitignore` honored for free); walk scopes get
+   `fsWalk.walkForBasenames` with their `excludeDirs`. A git scope git refuses to serve (exit 128)
+   degrades to a walk of that directory.
+3. **Widening to the repository top** — for scopes where the workspace folder is only a subdirectory,
+   the same query re-runs from `repoTop`. This is a whole-repo query, so it only runs on what is still
+   missing.
+4. **The git-ignored areas** — generated code git deliberately omits. Asking git for ignored *files*
+   would mean scanning every `node_modules`; instead `gitListIgnoredEntries()` asks for ignored
+   *entries* with directories collapsed (`--directory --no-empty-directory` — git never descends, so
+   this is essentially free), the build-output and dependency directories from `fsWalk.IGNORED_DIRS`
+   are dropped, and only what remains is walked.
+
+Candidates accumulate across rungs and are ranked by longest matching path suffix
+(`pathMatch.rankCandidates`), preferring a candidate inside a workspace folder when suffixes tie
+(rung 3 can reach outside them), then the shorter path. The resolver `stat`s down the ranked list, so a
+stale index entry (sparse checkout) does not sink the frame.
+
+If **git crashes** (killed, unexpected exit, spawn error — as opposed to "not a repo"), the resolver
+throws `GitSearchError` and the composite in `fileSearcherFactory.ts` falls the whole request back to
+`VscodeWorkspaceFileSearcher`. The core (`pathMatch`, `fsWalk`, `gitCli`, `searchScopes`,
+`candidateResolver`) imports no `vscode`, so it is unit-tested directly against real git fixtures in
+`src/test/nativeFileSearch.test.ts` (fixtures under `src/test/fixtures/sample-repo/`, plus throwaway
+repos built per layout test).
 
 ---
 

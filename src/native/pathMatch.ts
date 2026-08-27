@@ -47,22 +47,68 @@ export function trailingMatchLength(queryPath: string, candidatePath: string): n
     return score;
 }
 
+/** True when `candidate` is `dir` itself or lives underneath it (case-insensitive). */
+export function isSameOrInside(candidate: string, dir: string): boolean {
+    const normalizedDir = path.resolve(dir);
+    const normalizedCandidate = path.resolve(candidate);
+    if (normalizedCandidate.toLowerCase() === normalizedDir.toLowerCase()) return true;
+    const withSeparator = normalizedDir.endsWith(path.sep) ? normalizedDir : normalizedDir + path.sep;
+    return normalizedCandidate.toLowerCase().startsWith(withSeparator.toLowerCase());
+}
+
+/** Appends `root`/`relPath` to the `basenameLower -> paths` candidate map. */
+export function addCandidateTo(map: Map<string, string[]>, root: string, relPath: string): void {
+    const fullPath = path.join(root, relPath);
+    const nameLower = basenameLower(relPath);
+    const list = map.get(nameLower);
+    if (list) list.push(fullPath);
+    else map.set(nameLower, [fullPath]);
+}
+
 /**
  * Picks the best candidate for `queryPath` from `candidatePaths`.
- * Prefers the longest matching path suffix; ties break to the shorter path,
- * then lexicographically, so results are deterministic. Candidates that do not
- * share even the basename (score 0) are ignored.
+ * Prefers the longest matching path suffix; then a candidate inside one of
+ * `preferredPrefixes` (the workspace folders — the search may reach beyond them
+ * into the rest of the enclosing repository); then the shorter path, then
+ * lexicographically, so results are deterministic. Candidates that do not share
+ * even the basename (score 0) are ignored.
  */
-export function matchCandidate(queryPath: string, candidatePaths: ReadonlyArray<string>): string | undefined {
-    let best: { candidatePath: string; score: number } | undefined;
+export function matchCandidate(
+    queryPath: string,
+    candidatePaths: ReadonlyArray<string>,
+    preferredPrefixes: ReadonlyArray<string> = []
+): string | undefined {
+    return rankCandidates(queryPath, candidatePaths, preferredPrefixes)[0];
+}
+
+/**
+ * Same ordering as `matchCandidate`, but returns every plausible candidate best
+ * first. The caller walks the list until one passes a `stat`, so a stale index
+ * entry (sparse checkout, a deleted file) does not sink the whole frame.
+ */
+export function rankCandidates(
+    queryPath: string,
+    candidatePaths: ReadonlyArray<string>,
+    preferredPrefixes: ReadonlyArray<string> = []
+): string[] {
+    const isPreferred = (candidatePath: string): boolean =>
+        preferredPrefixes.some(prefix => isSameOrInside(candidatePath, prefix));
+
+    const scored = new Map<string, { score: number; preferred: boolean }>();
     for (const candidatePath of candidatePaths) {
+        if (scored.has(candidatePath)) continue;
         const score = trailingMatchLength(queryPath, candidatePath);
         if (score === 0) continue;
-        if (best == undefined || score > best.score || (score === best.score && isBetterTieBreak(candidatePath, best.candidatePath))) {
-            best = { candidatePath, score };
-        }
+        scored.set(candidatePath, { score, preferred: isPreferred(candidatePath) });
     }
-    return best?.candidatePath;
+
+    return [...scored.keys()].sort((a, b) => {
+        const left = scored.get(a)!;
+        const right = scored.get(b)!;
+        if (left.score !== right.score) return right.score - left.score;
+        if (left.preferred !== right.preferred) return left.preferred ? -1 : 1;
+        return isBetterTieBreak(a, b) ? -1 : 1;
+    });
 }
 
 function isBetterTieBreak(candidate: string, current: string): boolean {

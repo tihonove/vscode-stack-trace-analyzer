@@ -91,3 +91,112 @@ describe("fast file search over a fixture repo", () => {
         assertExpectedResolutions(await resolveFilePaths(filePaths, [repo], { useGitIndex: false }));
     });
 });
+
+// --- workspace layouts git alone used to mishandle -------------------------
+
+/** Writes `files` (relative path -> content) under `dir`, creating parents. */
+function writeFiles(dir: string, files: Record<string, string>): void {
+    for (const [relPath, content] of Object.entries(files)) {
+        const target = path.join(dir, relPath);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, content);
+    }
+}
+
+function initRepo(dir: string): string {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", "-A"], { cwd: dir });
+    return dir;
+}
+
+function tempDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "sta-layout-"));
+}
+
+const itGitLayout = hasGit() ? test : test.skip;
+
+describe("workspace folder holding several repositories", () => {
+    itGitLayout("resolves frames from every nested repo, and walks only the non-repo remainder", async () => {
+        const container = tempDir();
+        writeFiles(container, {
+            // `dist` is in the walk's IGNORED_DIRS — resolving it proves git served repo-a,
+            // rather than the filesystem walk quietly covering the whole container.
+            "repo-a/src/Alpha.cs": "",
+            "repo-a/dist/Tracked.cs": "",
+            "repo-b/src/Beta.cs": "",
+            "loose/src/Gamma.cs": "",
+        });
+        initRepo(path.join(container, "repo-a"));
+        initRepo(path.join(container, "repo-b"));
+
+        const resolved = await resolveFilePaths(
+            ["src/Alpha.cs", "dist/Tracked.cs", "src/Beta.cs", "src/Gamma.cs"],
+            [container]
+        );
+
+        expect(norm(resolved.get("src/Alpha.cs"))).toMatch(/repo-a\/src\/Alpha\.cs$/);
+        expect(norm(resolved.get("dist/Tracked.cs"))).toMatch(/repo-a\/dist\/Tracked\.cs$/);
+        expect(norm(resolved.get("src/Beta.cs"))).toMatch(/repo-b\/src\/Beta\.cs$/);
+        // the leftover non-repo area is still covered, by the walk
+        expect(norm(resolved.get("src/Gamma.cs"))).toMatch(/loose\/src\/Gamma\.cs$/);
+    });
+
+    itGitLayout("uses repo roots supplied by the host (vscode.git) for repos below the depth-1 probe", async () => {
+        const container = tempDir();
+        writeFiles(container, { "team/group/repo-c/dist/Deep.cs": "" });
+        const deepRepo = initRepo(path.join(container, "team/group/repo-c"));
+
+        // `dist` is pruned by the walk, so only a git scope for the deep repo can find this.
+        const resolved = await resolveFilePaths(["dist/Deep.cs"], [container], { repoRoots: [deepRepo] });
+        expect(norm(resolved.get("dist/Deep.cs"))).toMatch(/repo-c\/dist\/Deep\.cs$/);
+    });
+});
+
+describe("workspace folder that is only part of one repository", () => {
+    itGitLayout("widens to the repository top for frames outside the workspace folder", async () => {
+        const base = tempDir();
+        const repo = path.join(base, "monorepo");
+        writeFiles(repo, {
+            "services/api/src/Handler.cs": "",
+            "libs/shared/src/Shared.cs": "",
+        });
+        initRepo(repo);
+
+        const workspaceRoot = path.join(repo, "services/api");
+        const resolved = await resolveFilePaths(["src/Handler.cs", "src/Shared.cs"], [workspaceRoot]);
+
+        expect(norm(resolved.get("src/Handler.cs"))).toMatch(/services\/api\/src\/Handler\.cs$/);
+        // lives in a sibling folder of the repo: only the widened query reaches it
+        expect(norm(resolved.get("src/Shared.cs"))).toMatch(/libs\/shared\/src\/Shared\.cs$/);
+    });
+
+    itGitLayout("prefers a candidate inside the workspace folder when suffixes tie", async () => {
+        const base = tempDir();
+        const repo = path.join(base, "monorepo");
+        writeFiles(repo, {
+            ".gitignore": "**/generated/\n",
+            "services/api/generated/Model.cs": "",
+            "libs/shared/generated/Model.cs": "",
+            "services/api/src/Handler.cs": "",
+        });
+        initRepo(repo);
+
+        const workspaceRoot = path.join(repo, "services/api");
+        const resolved = await resolveFilePaths(["generated/Model.cs"], [workspaceRoot]);
+
+        expect(norm(resolved.get("generated/Model.cs"))).toMatch(/services\/api\/generated\/Model\.cs$/);
+    });
+
+    itGitLayout("keeps dependency directories out of the ignored-file query", async () => {
+        const base = tempDir();
+        const repo = path.join(base, "monorepo");
+        writeFiles(repo, {
+            ".gitignore": "node_modules/\n",
+            "node_modules/some-pkg/Vendor.cs": "",
+        });
+        initRepo(repo);
+
+        const resolved = await resolveFilePaths(["some-pkg/Vendor.cs"], [repo]);
+        expect(resolved.get("some-pkg/Vendor.cs")).toBeUndefined();
+    });
+});
