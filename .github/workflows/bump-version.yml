@@ -12,6 +12,14 @@ on:
                     - patch
                     - minor
                     - major
+            channel:
+                description: "Release channel"
+                required: true
+                default: stable
+                type: choice
+                options:
+                    - stable
+                    - pre-release
 
 permissions:
     contents: write
@@ -37,7 +45,17 @@ jobs:
 
             - name: Bump version
               run: |
-                  npm version ${{ github.event.inputs.bump_type }} -m "chore(release): %s"
+                  # The marketplace rejects semver prerelease versions, so the version
+                  # itself stays plain x.y.z and the channel is encoded in the tag:
+                  # v1.16.0 — stable, v1.16.0-pre — pre-release.
+                  VERSION="$(npm version ${{ github.event.inputs.bump_type }} --no-git-tag-version)"
+                  VERSION="${VERSION#v}"
+                  TAG="v$VERSION"
+                  if [ "${{ github.event.inputs.channel }}" = "pre-release" ]; then
+                      TAG="$TAG-pre"
+                  fi
+                  git commit -a -m "chore(release): $VERSION"
+                  git tag -a "$TAG" -m "chore(release): $VERSION"
 
             - name: Push commit and tag
               run: git push origin HEAD --follow-tags
