@@ -1,35 +1,50 @@
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { basenameLower, computeSmartCandidatePathsPure, matchCandidate } from "./pathMatch";
-import { walkForBasenames } from "./fsWalk";
+import { addCandidateTo, basenameLower, computeSmartCandidatePathsPure, rankCandidates } from "./pathMatch";
+import { IGNORED_DIRS, walkForBasenames } from "./fsWalk";
+import { gitLsFilesByBasenames, gitListIgnoredEntries } from "./gitCli";
+import { SearchScope, planSearchScopes } from "./searchScopes";
 
 // vscode-free core of the fast file searcher. It resolves stack-trace file paths
-// to absolute on-disk paths inside the given roots. Per query it tries, in order:
+// to absolute on-disk paths inside the given roots.
+//
+// The workspace is first turned into a plan of search scopes (see searchScopes.ts)
+// so that git serves as much of it as possible — including containers holding
+// several repositories and repositories nested inside a workspace folder — and a
+// filesystem walk only ever covers areas git cannot reach.
+//
+// Per batch the resolver climbs a ladder, each rung running only for the paths
+// still unresolved (so the expensive rungs see a shrinking set of basenames):
 //   1. a direct "smart candidate" stat,
-//   2. a targeted `git ls-files` pathspec query (git index),
-//   3. a filesystem walk of the git-served roots (nested repos, gitignored files),
-// keeping whatever an earlier stage already resolved. If git itself crashes
-// (killed, unexpected exit, spawn failure), a GitSearchError is thrown so the
-// caller can fall back to the legacy VS Code searcher.
+//   2. the primary pass: `git ls-files` per git scope, a walk per walk scope,
+//   3. widening: the same git query from the repository top level, for scopes
+//      where the workspace folder is only a subdirectory of the repository,
+//   4. the git-ignored areas — generated code git deliberately omits.
+//
+// If git itself crashes (killed, unexpected exit, spawn failure), a GitSearchError
+// is thrown so the caller can fall back to the legacy VS Code searcher.
+
+export { GitSearchError } from "./gitCli";
 
 export interface ResolveOptions {
     signal?: AbortSignal;
     /**
-     * Use the git index (`git ls-files`) as the primary file source when a root
-     * is a git repo. Defaults to `true`. When `false`, always use the filesystem
-     * walk and never invoke git.
+     * Use the git index (`git ls-files`) as the primary file source. Defaults to
+     * `true`. When `false`, always use the filesystem walk and never invoke git.
      */
     useGitIndex?: boolean;
+    /**
+     * Repository roots already known to the host (the `vscode.git` API). Lets the
+     * planner place git scopes without probing the disk. Empty in unit tests.
+     */
+    repoRoots?: ReadonlyArray<string>;
 }
 
-/** Thrown when git fails unexpectedly (not "not a repo") — signals: fall back to the legacy searcher. */
-export class GitSearchError extends Error {
-    public constructor(message: string) {
-        super(message);
-        this.name = "GitSearchError";
-    }
-}
+/** How many scopes are queried at once — git and walk scopes are independent. */
+const MAX_CONCURRENT_SCOPES = 4;
+
+/** Ranked candidates a single frame is allowed to `stat` before giving up. */
+const MAX_CANDIDATE_STATS = 10;
 
 async function pathExists(candidate: string): Promise<boolean> {
     try {
@@ -38,14 +53,6 @@ async function pathExists(candidate: string): Promise<boolean> {
     } catch {
         return false;
     }
-}
-
-function addCandidate(map: Map<string, string[]>, root: string, relPath: string): void {
-    const fullPath = path.join(root, relPath);
-    const nameLower = basenameLower(relPath);
-    const list = map.get(nameLower);
-    if (list) list.push(fullPath);
-    else map.set(nameLower, [fullPath]);
 }
 
 function mergeCandidates(target: Map<string, string[]>, source: Map<string, string[]>, wanted: ReadonlySet<string>): void {
@@ -57,140 +64,137 @@ function mergeCandidates(target: Map<string, string[]>, source: Map<string, stri
     }
 }
 
-/**
- * Queries git for files whose basename matches one of `basenames` inside `root`.
- * Output is streamed and split on NUL incrementally, so we never materialize the
- * whole `git ls-files` output as one buffer.
- *
- * Resolves to `undefined` when git can't serve this root and a filesystem walk
- * should be used instead: `root` is not a git repo (exit 128), git is not
- * installed (ENOENT), or the operation was aborted. This transparently covers
- * worktrees (a `.git` file, not a directory — git resolves it) and roots nested
- * above/below the repo top (git works from any subdirectory).
- *
- * Rejects with `GitSearchError` when git crashes: killed by a signal, an
- * unexpected non-zero exit, or an unexpected spawn error.
- */
-function gitLsFilesByBasenames(
-    root: string,
-    basenames: ReadonlyArray<string>,
-    signal?: AbortSignal
-): Promise<Map<string, string[]> | undefined> {
-    return new Promise((resolve, reject) => {
-        // A plain (non-`:(glob)`) pathspec treats `*` as matching across path
-        // separators, so `*Foo.cs` matches Foo.cs at any depth (incl. repo root).
-        // `:(icase)` makes it case-insensitive (basenames are lowercased, and disk
-        // casing may differ from the stack trace). Over-matches (e.g. `MyFoo.cs`)
-        // are filtered later by segment matching.
-        const pathspecs = basenames.map(name => ":(icase)*" + name);
-        const args = ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...pathspecs];
-
-        let child;
-        try {
-            child = spawn("git", args, { signal });
-        } catch (error) {
-            reject(new GitSearchError(`failed to spawn git: ${String(error)}`));
-            return;
+/** Runs `worker` over `items` with a bounded number of concurrent calls. */
+async function mapWithConcurrency<T, R>(
+    items: ReadonlyArray<T>,
+    limit: number,
+    worker: (item: T) => Promise<R>
+): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    let next = 0;
+    const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (true) {
+            const index = next++;
+            if (index >= items.length) return;
+            results[index] = await worker(items[index]!);
         }
-
-        const map = new Map<string, string[]>();
-        let buffer = "";
-        let settled = false;
-        const succeed = (value: Map<string, string[]> | undefined): void => {
-            if (settled) return;
-            settled = true;
-            resolve(value);
-        };
-        const fail = (error: GitSearchError): void => {
-            if (settled) return;
-            settled = true;
-            reject(error);
-        };
-
-        child.stdout.setEncoding("utf8");
-        child.stdout.on("data", (chunk: string) => {
-            buffer += chunk;
-            let idx: number;
-            while ((idx = buffer.indexOf("\0")) >= 0) {
-                const rel = buffer.slice(0, idx);
-                buffer = buffer.slice(idx + 1);
-                if (rel.length > 0) addCandidate(map, root, rel);
-            }
-        });
-        child.on("error", (error: NodeJS.ErrnoException) => {
-            // git not installed, or the run was cancelled → let the caller walk instead.
-            if (signal?.aborted || error.code === "ABORT_ERR" || error.name === "AbortError" || error.code === "ENOENT") {
-                succeed(undefined);
-                return;
-            }
-            fail(new GitSearchError(`git spawn error: ${error.message}`));
-        });
-        child.on("close", (code, closeSignal) => {
-            if (closeSignal != null) {
-                if (signal?.aborted) succeed(undefined);
-                else fail(new GitSearchError(`git was killed by ${closeSignal}`));
-                return;
-            }
-            if (code === 0) {
-                if (buffer.length > 0) addCandidate(map, root, buffer);
-                succeed(map);
-                return;
-            }
-            // 128 is git's "fatal" code, used for "not a git repository" — expected,
-            // fall back to a walk. Any other non-zero exit is treated as a crash.
-            if (code === 128) succeed(undefined);
-            else fail(new GitSearchError(`git exited with code ${code}`));
-        });
     });
+    await Promise.all(runners);
+    return results;
+}
+
+/** Distinct repository top levels of the git scopes, preserving plan order. */
+function distinctRepoTops(scopes: ReadonlyArray<SearchScope>, onlyWidened: boolean): string[] {
+    const tops: string[] = [];
+    const seen = new Set<string>();
+    for (const scope of scopes) {
+        if (scope.kind !== "git") continue;
+        if (onlyWidened && scope.repoTop === scope.dir) continue;
+        if (seen.has(scope.repoTop)) continue;
+        seen.add(scope.repoTop);
+        tops.push(scope.repoTop);
+    }
+    return tops;
 }
 
 /**
- * Collects candidate paths by basename across roots using the primary source
- * (git index when `useGitIndex`, otherwise a walk). Returns the merged
- * candidates plus the roots that git actually served, so the caller can walk
- * exactly those roots afterwards for anything git missed.
+ * Primary pass over the plan: git scopes are queried with `git ls-files`, walk
+ * scopes are walked. A git scope whose directory git refuses to serve (not a
+ * repo after all) degrades to a walk of that directory.
  */
-async function collectPrimaryCandidates(
+async function collectFromScopes(
     wanted: Set<string>,
-    roots: ReadonlyArray<string>,
-    options: ResolveOptions
-): Promise<{ candidates: Map<string, string[]>; gitServedRoots: string[] }> {
-    const candidates = new Map<string, string[]>();
-    const gitServedRoots: string[] = [];
-    const useGitIndex = options.useGitIndex !== false;
+    scopes: ReadonlyArray<SearchScope>,
+    signal?: AbortSignal
+): Promise<Map<string, string[]>> {
+    const basenames = [...wanted];
+    const perScope = await mapWithConcurrency(scopes, MAX_CONCURRENT_SCOPES, async scope => {
+        if (signal?.aborted) return new Map<string, string[]>();
+        if (scope.kind === "walk") {
+            return await walkForBasenames(scope.dir, wanted, signal, scope.excludeDirs);
+        }
+        const fromGit = await gitLsFilesByBasenames(scope.dir, basenames, { signal });
+        return fromGit ?? (await walkForBasenames(scope.dir, wanted, signal));
+    });
 
-    for (const root of roots) {
-        if (options.signal?.aborted) break;
-        let perRoot: Map<string, string[]> | undefined;
-        if (useGitIndex) {
-            perRoot = await gitLsFilesByBasenames(root, [...wanted], options.signal);
-            if (perRoot != undefined) gitServedRoots.push(root);
-        }
-        if (perRoot == undefined) {
-            perRoot = await walkForBasenames(root, wanted, options.signal);
-        }
-        mergeCandidates(candidates, perRoot, wanted);
-    }
-    return { candidates, gitServedRoots };
+    const candidates = new Map<string, string[]>();
+    for (const scopeCandidates of perScope) mergeCandidates(candidates, scopeCandidates, wanted);
+    return candidates;
 }
 
-async function walkRootsForBasenames(
+/** Runs `git ls-files` across `dirs` and merges what it found. */
+async function collectFromGitDirs(
     wanted: Set<string>,
-    roots: ReadonlyArray<string>,
+    dirs: ReadonlyArray<string>,
+    signal?: AbortSignal
+): Promise<Map<string, string[]>> {
+    const basenames = [...wanted];
+    const perDir = await mapWithConcurrency(dirs, MAX_CONCURRENT_SCOPES, async dir => {
+        if (signal?.aborted) return undefined;
+        return await gitLsFilesByBasenames(dir, basenames, { signal });
+    });
+
+    const candidates = new Map<string, string[]>();
+    for (const dirCandidates of perDir) {
+        if (dirCandidates != undefined) mergeCandidates(candidates, dirCandidates, wanted);
+    }
+    return candidates;
+}
+
+/** Ignored directories this many at most are walked per repository — a runaway guard. */
+const MAX_IGNORED_DIRS_WALKED = 32;
+
+/**
+ * Looks inside the git-ignored areas of `repoTops` — generated code that git
+ * deliberately omits from `ls-files`.
+ *
+ * Asking git for ignored *files* would mean scanning every `node_modules` in the
+ * repository. Instead we ask for ignored *entries* with directories collapsed
+ * (cheap, git never descends), drop the build-output and dependency directories
+ * the walk prunes anyway, and walk only what is left — in practice a handful of
+ * small generated folders.
+ */
+async function collectFromIgnoredAreas(
+    wanted: Set<string>,
+    repoTops: ReadonlyArray<string>,
     signal?: AbortSignal
 ): Promise<Map<string, string[]>> {
     const candidates = new Map<string, string[]>();
-    for (const root of roots) {
-        if (signal?.aborted) break;
-        mergeCandidates(candidates, await walkForBasenames(root, wanted, signal), wanted);
+    const perRepo = await mapWithConcurrency(repoTops, MAX_CONCURRENT_SCOPES, async repoTop => {
+        if (signal?.aborted) return undefined;
+        const entries = await gitListIgnoredEntries(repoTop, signal);
+        if (entries == undefined) return undefined;
+
+        const found = new Map<string, string[]>();
+        const dirsToWalk: string[] = [];
+        for (const entry of entries) {
+            if (entry.endsWith("/")) {
+                const relDir = entry.slice(0, -1);
+                if (IGNORED_DIRS.has(basenameLower(relDir))) continue;
+                if (dirsToWalk.length < MAX_IGNORED_DIRS_WALKED) dirsToWalk.push(path.join(repoTop, relDir));
+            } else if (wanted.has(basenameLower(entry))) {
+                // A standalone ignored file — no walking needed.
+                addCandidateTo(found, repoTop, entry);
+            }
+        }
+
+        for (const dir of dirsToWalk) {
+            if (signal?.aborted) break;
+            mergeCandidates(found, await walkForBasenames(dir, wanted, signal), wanted);
+        }
+        return found;
+    });
+
+    for (const repoCandidates of perRepo) {
+        if (repoCandidates != undefined) mergeCandidates(candidates, repoCandidates, wanted);
     }
     return candidates;
 }
 
 /**
  * Builds a `basenameLower -> [absolute candidate paths]` map across all roots,
- * preferring git and falling back to a filesystem walk per root. Kept for direct
- * use / testing; `resolveFilePaths` is the full pipeline.
+ * preferring git and falling back to a filesystem walk. Kept for direct use /
+ * testing; `resolveFilePaths` is the full pipeline.
  */
 export async function resolveByBasenames(
     basenames: ReadonlyArray<string>,
@@ -199,7 +203,11 @@ export async function resolveByBasenames(
 ): Promise<Map<string, string[]>> {
     const wanted = new Set(basenames.map(name => name.toLowerCase()).filter(name => name.length > 0));
     if (wanted.size === 0) return new Map<string, string[]>();
-    return (await collectPrimaryCandidates(wanted, roots, options)).candidates;
+    const scopes = await planSearchScopes(roots, options.repoRoots, {
+        useGitIndex: options.useGitIndex,
+        signal: options.signal,
+    });
+    return await collectFromScopes(wanted, scopes, options.signal);
 }
 
 /**
@@ -216,59 +224,89 @@ export async function resolveFilePaths(
     const result = new Map<string, string | undefined>();
     const distinct = [...new Set(filePaths)];
 
+    const scopes = await planSearchScopes(roots, options.repoRoots, {
+        useGitIndex: options.useGitIndex,
+        signal,
+    });
+
+    // Stack-trace paths often carry the build agent's directory name for the repo
+    // ("…/work/abc/my-repo/src/X.cs"), so repository tops are anchors too, not just
+    // the workspace folders.
+    const anchors = [...new Set([...roots, ...scopes.map(scope => (scope.kind === "git" ? scope.repoTop : scope.dir))])];
+
     // Stage 1: smart candidates — a direct stat, highest confidence, no git.
-    const unresolved: string[] = [];
+    let pending: string[] = [];
     for (const filePath of distinct) {
         if (signal?.aborted) {
             result.set(filePath, undefined);
             continue;
         }
         let found: string | undefined;
-        for (const candidate of computeSmartCandidatePathsPure(filePath, roots)) {
+        for (const candidate of computeSmartCandidatePathsPure(filePath, anchors)) {
             if (await pathExists(candidate)) {
                 found = candidate;
                 break;
             }
         }
         if (found != undefined) result.set(filePath, found);
-        else unresolved.push(filePath);
+        else pending.push(filePath);
     }
 
-    if (unresolved.length === 0 || roots.length === 0 || signal?.aborted) {
-        for (const filePath of unresolved) {
-            if (!result.has(filePath)) result.set(filePath, undefined);
+    // Candidates accumulate across stages so a later, wider stage can still lose to
+    // a better suffix match an earlier one found.
+    const candidates = new Map<string, string[]>();
+    const wantedOf = (paths: ReadonlyArray<string>): Set<string> =>
+        new Set(paths.map(basenameLower).filter(name => name.length > 0));
+
+    /** Re-matches every pending path against everything collected so far. */
+    const resolvePending = async (): Promise<void> => {
+        const stillPending: string[] = [];
+        for (const filePath of pending) {
+            const ranked = rankCandidates(filePath, candidates.get(basenameLower(filePath)) ?? [], roots);
+            let found: string | undefined;
+            for (const candidate of ranked.slice(0, MAX_CANDIDATE_STATS)) {
+                if (await pathExists(candidate)) {
+                    found = candidate;
+                    break;
+                }
+            }
+            if (found != undefined) result.set(filePath, found);
+            else stillPending.push(filePath);
         }
-        return result;
-    }
+        pending = stillPending;
+    };
 
-    // Stage 2: primary source (git index, with a per-root walk for non-git roots).
-    const wanted = new Set(unresolved.map(basenameLower).filter(name => name.length > 0));
-    const { candidates, gitServedRoots } = await collectPrimaryCandidates(wanted, roots, options);
-    const stillUnresolved: string[] = [];
-    for (const filePath of unresolved) {
-        const best = matchCandidate(filePath, candidates.get(basenameLower(filePath)) ?? []);
-        if (best != undefined && (await pathExists(best))) result.set(filePath, best);
-        else stillUnresolved.push(filePath);
-    }
+    const runStage = async (collect: (wanted: Set<string>) => Promise<Map<string, string[]>>): Promise<void> => {
+        if (pending.length === 0 || signal?.aborted) return;
+        const wanted = wantedOf(pending);
+        if (wanted.size === 0) return;
+        mergeCandidates(candidates, await collect(wanted), wanted);
+        await resolvePending();
+    };
 
-    // Stage 3: whatever git couldn't resolve, keep the fast wins and continue by
-    // walking the git-served roots on disk (nested repos, submodules, gitignored
-    // generated files git deliberately omits). Non-git roots were already walked
-    // in stage 2, so we only re-scan the roots git served here.
-    if (stillUnresolved.length > 0 && gitServedRoots.length > 0 && !signal?.aborted) {
-        const wanted3 = new Set(stillUnresolved.map(basenameLower).filter(name => name.length > 0));
-        const walkCandidates = await walkRootsForBasenames(wanted3, gitServedRoots, signal);
-        for (const filePath of stillUnresolved) {
-            const combined = [
-                ...(candidates.get(basenameLower(filePath)) ?? []),
-                ...(walkCandidates.get(basenameLower(filePath)) ?? []),
-            ];
-            const best = matchCandidate(filePath, combined);
-            result.set(filePath, best != undefined && (await pathExists(best)) ? best : undefined);
+    if (scopes.length > 0) {
+        // Stage 2: the primary pass — git per git scope, a walk per walk scope.
+        await runStage(wanted => collectFromScopes(wanted, scopes, signal));
+
+        // Stage 3: widen to the repository top for workspace folders that are only a
+        // subdirectory of their repository. `git ls-files` from a subdirectory reports
+        // that subtree only, so anything living in a sibling folder of the repo needs
+        // this — but it is a whole-repo scan, so it runs only on what is still missing.
+        const widenedTops = distinctRepoTops(scopes, true);
+        if (widenedTops.length > 0) {
+            await runStage(wanted => collectFromGitDirs(wanted, widenedTops, signal));
         }
-    } else {
-        for (const filePath of stillUnresolved) result.set(filePath, undefined);
+
+        // Stage 4: the git-ignored areas (generated code). Build output and
+        // dependency directories stay excluded, matching what the walk prunes.
+        const allTops = distinctRepoTops(scopes, false);
+        if (allTops.length > 0) {
+            await runStage(wanted => collectFromIgnoredAreas(wanted, allTops, signal));
+        }
     }
 
+    for (const filePath of pending) {
+        if (!result.has(filePath)) result.set(filePath, undefined);
+    }
     return result;
 }

@@ -3,7 +3,7 @@ import * as path from "node:path";
 
 // Directory names skipped entirely while walking. Mirrors (and slightly extends)
 // the exclude behavior of the previous VS Code `findFiles` search.
-const IGNORED_DIRS = new Set([".git", "node_modules", ".hg", ".svn", "bin", "obj", ".vs", "dist", "out", ".idea"]);
+export const IGNORED_DIRS = new Set([".git", "node_modules", ".hg", ".svn", "bin", "obj", ".vs", "dist", "out", ".idea"]);
 
 const MAX_CONCURRENT_READDIRS = 16;
 
@@ -12,13 +12,19 @@ const MAX_CONCURRENT_READDIRS = 16;
  * in `wanted`. Symlinks are not followed. vscode-free so it can back both the
  * extension and the tests. Concurrency is bounded to avoid exhausting file
  * descriptors on huge trees.
+ *
+ * `excludeDirs` holds absolute directories to skip entirely — used to carve the
+ * git repositories discovered inside a non-repo workspace folder out of the walk,
+ * since those are served by `git ls-files` instead.
  */
 export async function walkForBasenames(
     root: string,
     wanted: ReadonlySet<string>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    excludeDirs: ReadonlyArray<string> = []
 ): Promise<Map<string, string[]>> {
     const result = new Map<string, string[]>();
+    const excluded = new Set(excludeDirs.map(dir => path.resolve(dir).toLowerCase()));
     let active = 0;
     const pending: Array<() => void> = [];
 
@@ -52,7 +58,10 @@ export async function walkForBasenames(
         for (const entry of entries) {
             if (entry.isSymbolicLink()) continue;
             if (entry.isDirectory()) {
-                if (!IGNORED_DIRS.has(entry.name)) subdirs.push(path.join(dir, entry.name));
+                if (IGNORED_DIRS.has(entry.name)) continue;
+                const subdir = path.join(dir, entry.name);
+                if (excluded.has(path.resolve(subdir).toLowerCase())) continue;
+                subdirs.push(subdir);
             } else if (entry.isFile()) {
                 const nameLower = entry.name.toLowerCase();
                 if (wanted.has(nameLower)) {

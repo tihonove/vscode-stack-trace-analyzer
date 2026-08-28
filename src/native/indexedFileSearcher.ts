@@ -2,11 +2,14 @@ import * as vscode from "vscode";
 import { FileSearcher } from "../workspaceFileResolver";
 import { IProgressReporter } from "../utils/progressTracker";
 import { resolveFilePaths } from "./candidateResolver";
+import { getKnownRepoRoots } from "./vscodeGitRepos";
 
 /**
  * Fast `FileSearcher` backed by the vscode-free resolver core: smart-candidate
- * stat → targeted `git ls-files` → filesystem walk. It only touches VS Code to
- * read the workspace folders and to bridge the cancellation token.
+ * stat → targeted `git ls-files` per search scope → widening to the repository
+ * top → `git ls-files --ignored`, with a filesystem walk only for areas git
+ * cannot serve. It only touches VS Code to read the workspace folders, to pick up
+ * the repositories `vscode.git` already found, and to bridge the cancellation token.
  */
 export class IndexedFileSearcher implements FileSearcher {
     public constructor(private readonly options: { useGitIndex?: boolean } = {}) {}
@@ -33,6 +36,7 @@ export class IndexedFileSearcher implements FileSearcher {
             return await resolveFilePaths(filePaths, roots, {
                 signal: abortController.signal,
                 useGitIndex: this.options.useGitIndex ?? true,
+                repoRoots: getKnownRepoRoots(),
             });
         } finally {
             cancellationSubscription.dispose();
