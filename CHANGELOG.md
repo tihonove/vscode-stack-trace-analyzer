@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. Versions ending in
 `-pre` were published to the pre-release channel only.
 
+## [1.18.0] - 2026-09-09
+
+### Features
+
+- Enable the git-index searcher by default
+
+### Bug Fixes
+
+- Ship the panel icon and stop shipping build artefacts
+- Correct the changelog template spacing and the release recipe
+
+### Documentation
+
+- Rewrite the README as a listing page
+- Add CHANGELOG.md and a git-cliff config
+
+### Miscellaneous
+
+- *(marketplace)* Retarget categories, keywords and positioning
+
 ## [1.17.0-pre] - 2026-09-09
 
 ### Features

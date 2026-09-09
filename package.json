@@ -3,7 +3,7 @@
 	"displayName": "Stack Trace Analyzer - clickable stack traces",
 	"description": "Analyze Stack Trace like in IntelliJ IDEA - paste any stack trace or traceback and jump straight to the code. Any language, any source: CI logs, Sentry, Slack.",
 	"publisher": "tihonove",
-	"version": "1.17.0",
+	"version": "1.18.0",
 	"license": "MIT",
 	"engines": {
 		"vscode": "^1.74.0"
