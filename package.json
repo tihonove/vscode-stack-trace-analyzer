@@ -47,7 +47,8 @@
 		"out",
 		"package.json",
 		"logo.png",
-		"LICENSE.md"
+		"LICENSE.md",
+		"src/stacktrace.svg"
 	],
 	"contributes": {
 		"configuration": {
@@ -158,6 +159,7 @@
 	"scripts": {
 		"build": "tsc && copyfiles --flat src/webview/client/*.css out/webview/client",
 		"test": "vitest run",
+		"typecheck": "tsc --noEmit -p tsconfig.test.json",
 		"vscode:prepublish": "npm run build"
 	},
 	"devDependencies": {
