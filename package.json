@@ -1,7 +1,7 @@
 {
 	"name": "stack-trace-analyzer",
-	"displayName": "Stack trace analyzer",
-	"description": "Easy way to analyze stack traces from any language and sources",
+	"displayName": "Stack Trace Analyzer - clickable stack traces",
+	"description": "Analyze Stack Trace like in IntelliJ IDEA - paste any stack trace or traceback and jump straight to the code. Any language, any source: CI logs, Sentry, Slack.",
 	"publisher": "tihonove",
 	"version": "1.17.0",
 	"license": "MIT",
@@ -12,24 +12,33 @@
 		"type": "git",
 		"url": "https://github.com/tihonove/vscode-stack-trace-analyzer.git"
 	},
+	"bugs": {
+		"url": "https://github.com/tihonove/vscode-stack-trace-analyzer/issues"
+	},
+	"homepage": "https://github.com/tihonove/vscode-stack-trace-analyzer#readme",
+	"qna": "marketplace",
+	"galleryBanner": {
+		"color": "#92140C",
+		"theme": "dark"
+	},
 	"extensionKind": [
 		"workspace"
 	],
 	"categories": [
-		"Programming Languages"
+		"Debuggers",
+		"Other"
 	],
 	"keywords": [
+		"stacktrace",
 		"stack trace",
-		"stack trace analyzer",
-		"C",
-		"C#",
-		"Go",
-		"Java",
-		"JavaScript",
-		"PHP",
-		"Python",
-		"Ruby",
-		"Rust"
+		"traceback",
+		"backtrace",
+		"exception",
+		"crash",
+		"call stack",
+		"error log",
+		"panic",
+		"debug"
 	],
 	"icon": "./logo.png",
 	"activationEvents": [],
