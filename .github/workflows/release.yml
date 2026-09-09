@@ -70,8 +70,12 @@ jobs:
             - name: Install ovsx
               run: npm install -g ovsx
 
+            # --allow-unused-files-pattern: CHANGELOG.md must be listed in the "files"
+            # property to be packaged at all, but vsce turns it into an in-memory
+            # asset before running its unused-pattern check, so the check reports it
+            # as unmatched and exits non-zero.
             - name: Package Extension
-              run: vsce package --no-git-tag-version ${{ steps.meta.outputs.pre_release_flag }}
+              run: vsce package --no-git-tag-version --allow-unused-files-pattern ${{ steps.meta.outputs.pre_release_flag }}
 
             - name: Publish to VS Marketplace
               env:

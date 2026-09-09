@@ -48,6 +48,7 @@
 		"package.json",
 		"logo.png",
 		"LICENSE.md",
+		"CHANGELOG.md",
 		"src/stacktrace.svg"
 	],
 	"contributes": {

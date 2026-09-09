@@ -1,0 +1,72 @@
+# git-cliff configuration — https://git-cliff.org/docs/configuration
+#
+# Used in two places, both of which pick this file up by its name alone:
+#   * `.github/workflows/release.yml`, where orhun/git-cliff-action defaults its
+#     `config` input to `cliff.toml`, to build the GitHub Release body;
+#   * `git cliff --tag vX.Y.Z --prepend CHANGELOG.md`, run by hand in the same
+#     commit that bumps the version (see AGENTS.md).
+#
+# Both must produce the same text for a given range, so nothing here is
+# release-specific.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented here. Versions ending in
+`-pre` were published to the pre-release channel only.
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+{% for commit in commits %}\
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+{% if commit.breaking %}**breaking:** {% endif %}\
+{{ commit.message | upper_first }}
+{% endfor %}\
+{% endfor %}\n
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+filter_commits = false
+protect_breaking_commits = true
+sort_commits = "oldest"
+tag_pattern = "v[0-9].*"
+
+# `(#38)` becomes a link. vsce's own issue autolinker only fires after
+# whitespace, so the link has to be explicit for the Marketplace changelog tab to
+# render it. No `$` anchor: git-cliff matches against the whole commit message,
+# not the subject line, so an anchored pattern silently never fires.
+commit_preprocessors = [
+    { pattern = '\s*\(#(\d+)\)', replace = " ([#${1}](https://github.com/tihonove/vscode-stack-trace-analyzer/pull/${1}))" },
+]
+
+commit_parsers = [
+    # Noise. The release commits are the important one: the built-in default only
+    # skips `chore(release): prepare for`, so ours used to land in every release body.
+    { message = '^chore\(release\)', skip = true },
+    { message = '^chore\(deps', skip = true },
+    { message = '^\d+\.\d+\.\d+', skip = true },
+    { message = '^Merge ', skip = true },
+
+    # Groups. The `<!-- N -->` prefixes only exist to order the groups (group_by
+    # sorts them as strings); `striptags` removes them when rendering.
+    { message = '^feat', group = '<!-- 0 -->Features' },
+    { message = '^fix', group = '<!-- 1 -->Bug Fixes' },
+    { message = '^perf', group = '<!-- 2 -->Performance' },
+    { message = '^refactor', group = '<!-- 3 -->Refactor' },
+    { message = '^docs?', group = '<!-- 4 -->Documentation' },
+    { message = '^test', group = '<!-- 5 -->Testing' },
+    { message = '^(chore|ci|build|style)', group = '<!-- 6 -->Miscellaneous' },
+    { message = '^revert', group = '<!-- 7 -->Reverted' },
+]
