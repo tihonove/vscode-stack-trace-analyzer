@@ -20,7 +20,7 @@ Open VSX.
 Перед тегированием обнови changelog тем же коммитом, что бампает версию:
 
 ```
-git cliff --tag vX.Y.Z --prepend CHANGELOG.md
+git cliff --tag vX.Y.Z --unreleased --prepend CHANGELOG.md
 ```
 
 Конфиг — `cliff.toml` в корне, он же используется workflow-ом для тела GitHub Release, так что

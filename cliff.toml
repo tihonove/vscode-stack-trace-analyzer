@@ -17,6 +17,7 @@ All notable changes to this project are documented here. Versions ending in
 `-pre` were published to the pre-release channel only.
 """
 body = """
+
 {% if version %}\
 ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
@@ -30,7 +31,7 @@ body = """
 {% if commit.breaking %}**breaking:** {% endif %}\
 {{ commit.message | upper_first }}
 {% endfor %}\
-{% endfor %}\n
+{% endfor %}
 """
 footer = ""
 trim = true
