@@ -135,15 +135,17 @@ Reusable building blocks for composing tokenizers:
 
 `computeSmartCandidatePaths` lives in `workspaceFileResolver.ts` — takes `filePath` and workspace folders, then returns candidate `vscode.Uri` values built with `vscode.Uri.joinPath()`. Tested in `src/test/computeSmartCandidatePaths.test.ts`.
 
-#### Fast searcher (opt-in)
+#### Fast searcher (the default)
 
 On large repos the `findFiles("**/*/…")` fallback above is slow (a full workspace walk per suffix
-candidate, per frame, with no dedup). An opt-in **fast, vscode-free resolver** lives in `src/native/`,
-selected by `createFileSearcher()` (`fileSearcherFactory.ts`) from the `stack-trace-analyzer.search.*`
-feature flags (the highest-priority enabled one wins; the legacy `VscodeWorkspaceFileSearcher` is the
-base fallback when none is set):
+candidate, per frame, with no dedup) — on a Java monorepo one 30-frame trace took 82 s through it
+versus 5 s through the git index. The **fast, vscode-free resolver** in `src/native/` is therefore the
+default; `createFileSearcher()` (`fileSearcherFactory.ts`) picks it from the
+`stack-trace-analyzer.search.*` feature flags (the highest-priority enabled one wins; the legacy
+`VscodeWorkspaceFileSearcher` is the base fallback, reached only when every flag is off):
 
-- **`search.gitIndex`** — the fast resolver, git first (with filesystem-walk fallbacks internally).
+- **`search.gitIndex`** (default **on**) — the fast resolver, git first (with filesystem-walk
+  fallbacks internally). Turning it off restores VS Code's workspace search.
 - *(future: `search.native`, `search.filesystem`, slotting in as more flags ordered fastest-first.)*
 
 `createFileSearcher()` is called per analysis, so a flag change takes effect without reloading the

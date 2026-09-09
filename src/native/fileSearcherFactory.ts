@@ -9,9 +9,9 @@ const log = createScopedLogger("searcher");
 /**
  * Builds the file searcher used by the extension from the `stack-trace-analyzer.search.*`
  * feature flags. The enabled method with the highest priority wins; VS Code's
- * `VscodeWorkspaceFileSearcher` is the base fallback when no flag is set. New
- * strategies (e.g. a future `search.native`) slot in as another flag + branch,
- * ordered fastest/preferred first.
+ * `VscodeWorkspaceFileSearcher` is the base fallback, reached only when every
+ * flag is off. New strategies (e.g. a future `search.native`) slot in as another
+ * flag + branch, ordered fastest/preferred first.
  *
  * The fast methods are wrapped in a composite that transparently falls back to
  * `VscodeWorkspaceFileSearcher` if the fast path throws, so a resolver hiccup
@@ -22,13 +22,13 @@ export function createFileSearcher(): FileSearcher {
     const fallback = new VscodeWorkspaceFileSearcher();
 
     // Priority order, fastest/preferred first. (Future: search.native, search.filesystem.)
-    if (config.get<boolean>("search.gitIndex", false)) {
+    if (config.get<boolean>("search.gitIndex", true)) {
         log.info("Using the git-index searcher (stack-trace-analyzer.search.gitIndex is on).");
         return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: true }), fallback);
     }
     log.info(
-        "Using VS Code workspace search — the slow path on large repositories. " +
-            "Enable stack-trace-analyzer.search.gitIndex to resolve paths through the git index instead."
+        "Using VS Code workspace search — the slow path on large repositories, " +
+            "in use because stack-trace-analyzer.search.gitIndex was turned off."
     );
     return fallback;
 }

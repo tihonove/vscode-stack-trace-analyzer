@@ -46,8 +46,8 @@
 			"properties": {
 				"stack-trace-analyzer.search.gitIndex": {
 					"type": "boolean",
-					"default": false,
-					"markdownDescription": "Resolve stack-trace file paths using the git index (`git ls-files`) — usually the fastest option on large repos and it honors `.gitignore`. Handles workspace folders that hold several repositories, repositories nested inside a folder, and folders that are only a subdirectory of a larger repository (the search widens to the repository root). A filesystem scan is used only where git cannot reach, and VS Code's workspace search if git crashes. When off, VS Code's built-in workspace search is used."
+					"default": true,
+					"markdownDescription": "Resolve stack-trace file paths using the git index (`git ls-files`) — usually the fastest option on large repos and it honors `.gitignore`. Handles workspace folders that hold several repositories, repositories nested inside a folder, and folders that are only a subdirectory of a larger repository (the search widens to the repository root). A filesystem scan is used only where git cannot reach, and VS Code's workspace search if git crashes. Turn this off to go back to VS Code's built-in workspace search, which is markedly slower on large repositories."
 				}
 			}
 		},
