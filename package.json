@@ -109,6 +109,11 @@
 				"title": "Enable VCS Integration",
 				"icon": "$(source-control)",
 				"enablement": "true"
+			},
+			{
+				"command": "stack-trace-analyzer.showLogs",
+				"category": "Stack Trace Analyzer",
+				"title": "Show logs"
 			}
 		],
 		"menus": {

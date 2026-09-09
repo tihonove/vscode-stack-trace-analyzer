@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
 import { addCandidateTo } from "./pathMatch";
+import { createScopedLogger, startTimer } from "../utils/logger";
+
+const log = createScopedLogger("git");
+
+/** A single git call slower than this is worth pointing at in the log. */
+const SLOW_GIT_CALL_MS = 1500;
 
 // Thin, vscode-free wrappers around the `git` CLI used by the fast file searcher.
 // Everything here distinguishes two failure kinds:
@@ -75,9 +81,12 @@ function gitCapture(cwd: string, args: ReadonlyArray<string>, signal?: AbortSign
  * worktrees and directories nested at any depth below the repo top.
  */
 export async function gitTopLevel(dir: string, signal?: AbortSignal): Promise<string | undefined> {
+    const elapsed = startTimer();
     const out = await gitCapture(dir, ["rev-parse", "--show-toplevel"], signal);
     const top = out?.trim();
-    return top != undefined && top.length > 0 ? top : undefined;
+    const found = top != undefined && top.length > 0 ? top : undefined;
+    log.trace(`rev-parse --show-toplevel in ${dir} → ${found ?? "not a repository"} (${elapsed()} ms)`);
+    return found;
 }
 
 export interface LsFilesOptions {
@@ -129,6 +138,15 @@ function lsFilesChunk(
         const pathspecs = basenames.map(name => ":(icase)*" + name);
         const args = ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...pathspecs];
 
+        const elapsed = startTimer();
+        let matches = 0;
+        const report = (outcome: string): void => {
+            const ms = elapsed();
+            const message = `ls-files in ${root}: ${basenames.length} basename(s) → ${matches} match(es), ${outcome} (${ms} ms)`;
+            if (ms >= SLOW_GIT_CALL_MS) log.warn(message);
+            else log.debug(message);
+        };
+
         let child;
         try {
             child = spawn("git", args, { signal });
@@ -157,11 +175,15 @@ function lsFilesChunk(
             while ((idx = buffer.indexOf("\0")) >= 0) {
                 const rel = buffer.slice(0, idx);
                 buffer = buffer.slice(idx + 1);
-                if (rel.length > 0) addCandidateTo(map, root, rel);
+                if (rel.length > 0) {
+                    addCandidateTo(map, root, rel);
+                    matches++;
+                }
             }
         });
         child.on("error", (error: NodeJS.ErrnoException) => {
             if (isBenignSpawnFailure(error, signal)) {
+                report(`git unavailable (${error.code ?? error.name}) — falling back to a disk walk`);
                 succeed(false);
                 return;
             }
@@ -169,19 +191,29 @@ function lsFilesChunk(
         });
         child.on("close", (code, closeSignal) => {
             if (closeSignal != null) {
-                if (signal?.aborted) succeed(false);
-                else fail(new GitSearchError(`git was killed by ${closeSignal}`));
+                if (signal?.aborted) {
+                    report("cancelled");
+                    succeed(false);
+                } else {
+                    fail(new GitSearchError(`git was killed by ${closeSignal}`));
+                }
                 return;
             }
             if (code === 0) {
-                if (buffer.length > 0) addCandidateTo(map, root, buffer);
+                if (buffer.length > 0) {
+                    addCandidateTo(map, root, buffer);
+                    matches++;
+                }
+                report("ok");
                 succeed(true);
                 return;
             }
             // 128 is git's "fatal" code, used for "not a git repository" — expected,
             // fall back to a walk. Any other non-zero exit is treated as a crash.
-            if (code === 128) succeed(false);
-            else fail(new GitSearchError(`git exited with code ${code}`));
+            if (code === 128) {
+                report("not a git repository — falling back to a disk walk");
+                succeed(false);
+            } else fail(new GitSearchError(`git exited with code ${code}`));
         });
     });
 }
@@ -220,6 +252,14 @@ export function gitListIgnoredEntries(root: string, signal?: AbortSignal): Promi
             return;
         }
 
+        const elapsed = startTimer();
+        const report = (outcome: string, count: number): void => {
+            const ms = elapsed();
+            const message = `ls-files --ignored --directory in ${root}: ${count} entry/ies, ${outcome} (${ms} ms)`;
+            if (ms >= SLOW_GIT_CALL_MS) log.warn(message);
+            else log.debug(message);
+        };
+
         let buffer = "";
         const entries: string[] = [];
         let settled = false;
@@ -240,22 +280,29 @@ export function gitListIgnoredEntries(root: string, signal?: AbortSignal): Promi
             }
         });
         child.on("error", (error: NodeJS.ErrnoException) => {
-            if (isBenignSpawnFailure(error, signal)) settle(() => resolve(undefined));
-            else settle(() => reject(new GitSearchError(`git spawn error: ${error.message}`)));
+            if (isBenignSpawnFailure(error, signal)) {
+                report(`git unavailable (${error.code ?? error.name})`, entries.length);
+                settle(() => resolve(undefined));
+            } else settle(() => reject(new GitSearchError(`git spawn error: ${error.message}`)));
         });
         child.on("close", (code, closeSignal) => {
             if (closeSignal != null) {
-                if (signal?.aborted) settle(() => resolve(undefined));
-                else settle(() => reject(new GitSearchError(`git was killed by ${closeSignal}`)));
+                if (signal?.aborted) {
+                    report("cancelled", entries.length);
+                    settle(() => resolve(undefined));
+                } else settle(() => reject(new GitSearchError(`git was killed by ${closeSignal}`)));
                 return;
             }
             if (code === 0) {
                 if (buffer.length > 0) entries.push(buffer);
+                report("ok", entries.length);
                 settle(() => resolve(entries));
                 return;
             }
-            if (code === 128) settle(() => resolve(undefined));
-            else settle(() => reject(new GitSearchError(`git exited with code ${code}`)));
+            if (code === 128) {
+                report("not a git repository", entries.length);
+                settle(() => resolve(undefined));
+            } else settle(() => reject(new GitSearchError(`git exited with code ${code}`)));
         });
     });
 }

@@ -6,11 +6,32 @@ import { enrichTokensWithWorkspacePaths } from "./workspaceFileResolver";
 import { createFileSearcher } from "./native/fileSearcherFactory";
 import { createDeltaProgressTracker } from "./utils/progressTracker";
 import { preprocessJsonInText } from "./utils/jsonPreprocessor";
+import { createScopedLogger, startTimer } from "./utils/logger";
+
+const log = createScopedLogger("analyze");
 
 type StackTraceInfo = {
     source: string;
     lines?: Token[][];
 };
+
+function countFilePathTokens(lines: Token[][] | undefined): number {
+    if (lines == undefined) return 0;
+    return lines.reduce(
+        (count, lineTokens) => count + lineTokens.filter(([, meta]) => meta?.type === "FilePath").length,
+        0
+    );
+}
+
+function countResolvedFilePathTokens(lines: Token[][] | undefined): number {
+    if (lines == undefined) return 0;
+    return lines.reduce(
+        (count, lineTokens) =>
+            count +
+            lineTokens.filter(([, meta]) => meta?.type === "FilePath" && meta.fileUriPath != undefined).length,
+        0
+    );
+}
 
 export class ExtensionController {
     private readonly context: vscode.ExtensionContext;
@@ -55,16 +76,28 @@ export class ExtensionController {
                 cancellable: true,
             },
             async (progress, cancellationToken) => {
+                const totalElapsed = startTimer();
+                log.info(`Analyzing a stack trace of ${clipboardContent.length} character(s) from the clipboard.`);
+
                 progress.report({ message: "Parsing stacktrace" });
+                const parseElapsed = startTimer();
                 const preprocessedContent = preprocessJsonInText(clipboardContent);
                 stackTraceInfo.lines = splitIntoTokens(preprocessedContent, (progressIncrementValue: number) => {
                     progress.report({ increment: progressIncrementValue * 10 });
                 });
+                // Counted here, before the search: unresolved file-path tokens lose their
+                // metadata during enrichment, so afterwards only the resolved ones are left.
+                const filePathTokenCount = countFilePathTokens(stackTraceInfo.lines);
+                log.info(
+                    `Parsed ${stackTraceInfo.lines?.length ?? 0} line(s) with ` +
+                        `${filePathTokenCount} file-path token(s) in ${parseElapsed()} ms.`
+                );
                 if (stackTraceInfo.lines) {
                     this.showStackTraceTokensInWebView(stackTraceInfo.lines.map(x => x.map(t => [t[0]])));
                 }
 
                 progress.report({ message: "Searching files" });
+                const searchElapsed = startTimer();
                 if (stackTraceInfo.lines) {
                     const searchProgress = createDeltaProgressTracker(
                         delta => progress.report({ increment: delta * 90 })
@@ -81,10 +114,18 @@ export class ExtensionController {
                             }
                         }
                     );
+                    log.info(
+                        `File search finished in ${searchElapsed()} ms: ` +
+                            `${countResolvedFilePathTokens(stackTraceInfo.lines)}/${filePathTokenCount} ` +
+                            `file-path token(s) resolved` +
+                            (cancellationToken.isCancellationRequested ? " (cancelled)" : "") +
+                            "."
+                    );
                 }
                 this.storeStackTracesToWorkspaceState();
 
                 if (this.isVcsIntegrationEnabled && stackTraceInfo.lines) {
+                    const vcsElapsed = startTimer();
                     stackTraceInfo.lines = await this.enrichWorkspacePathsWithVscInfo(
                         stackTraceInfo.lines,
                         cancellationToken,
@@ -96,8 +137,11 @@ export class ExtensionController {
                             }
                         }
                     );
+                    log.info(`VCS enrichment finished in ${vcsElapsed()} ms.`);
                     this.storeStackTracesToWorkspaceState();
                 }
+
+                log.info(`Analysis finished in ${totalElapsed()} ms.`);
 
                 if (this.view == undefined) {
                     vscode.window.showInformationMessage("Extension is still initializing, please wait...");

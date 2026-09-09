@@ -1,5 +1,11 @@
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
+import { createScopedLogger, startTimer } from "../utils/logger";
+
+const log = createScopedLogger("walk");
+
+/** A walk slower than this is the usual culprit behind a sluggish search. */
+const SLOW_WALK_MS = 1500;
 
 // Directory names skipped entirely while walking. Mirrors (and slightly extends)
 // the exclude behavior of the previous VS Code `findFiles` search.
@@ -25,6 +31,8 @@ export async function walkForBasenames(
 ): Promise<Map<string, string[]>> {
     const result = new Map<string, string[]>();
     const excluded = new Set(excludeDirs.map(dir => path.resolve(dir).toLowerCase()));
+    const elapsed = startTimer();
+    let directoriesVisited = 0;
     let active = 0;
     const pending: Array<() => void> = [];
 
@@ -54,6 +62,7 @@ export async function walkForBasenames(
             release();
         }
 
+        directoriesVisited++;
         const subdirs: string[] = [];
         for (const entry of entries) {
             if (entry.isSymbolicLink()) continue;
@@ -77,5 +86,16 @@ export async function walkForBasenames(
     };
 
     await walk(root);
+
+    const matches = [...result.values()].reduce((total, paths) => total + paths.length, 0);
+    const ms = elapsed();
+    const message =
+        `Walked ${directoriesVisited} directory/ies under ${root} in ${ms} ms: ` +
+        `${matches} match(es) for ${wanted.size} basename(s)` +
+        (signal?.aborted ? " (aborted)" : "");
+    // A disk walk means git could not serve this area; on a big tree it is what a
+    // user experiences as "the search hangs".
+    if (ms >= SLOW_WALK_MS) log.warn(message);
+    else log.debug(message);
     return result;
 }

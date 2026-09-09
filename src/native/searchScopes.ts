@@ -3,6 +3,9 @@ import * as path from "node:path";
 import { gitTopLevel } from "./gitCli";
 import { isSameOrInside } from "./pathMatch";
 import { IGNORED_DIRS } from "./fsWalk";
+import { createScopedLogger, formatList, startTimer } from "../utils/logger";
+
+const log = createScopedLogger("scopes");
 
 // Turns the workspace folders into a plan of *search scopes*.
 //
@@ -97,8 +100,10 @@ export async function planSearchScopes(
     options: { useGitIndex?: boolean | undefined; signal?: AbortSignal | undefined } = {}
 ): Promise<SearchScope[]> {
     const { useGitIndex = true, signal } = options;
+    const elapsed = startTimer();
     const normalizedRoots = [...new Set(roots.map(normalize))];
     if (!useGitIndex) {
+        log.debug(`Git is disabled — every one of ${normalizedRoots.length} folder(s) will be walked from disk.`);
         return normalizedRoots.map(dir => ({ kind: "walk", dir, excludeDirs: [] }));
     }
 
@@ -123,15 +128,33 @@ export async function planSearchScopes(
         const contained = [...new Set([...nested, ...(await scanContainerForRepos(root, signal))])];
 
         if (enclosing != undefined) {
-            addGitScope(root, normalize(enclosing));
+            const repoTop = normalize(enclosing);
+            log.debug(
+                `${root}: inside repository ${repoTop}` +
+                    (repoTop === root ? "" : " (a subdirectory — the search may widen to the repository top)") +
+                    (contained.length > 0 ? `, containing ${contained.length} nested repository/ies` : "")
+            );
+            addGitScope(root, repoTop);
             for (const nestedRepo of contained) addGitScope(nestedRepo, nestedRepo);
             continue;
         }
 
         // The root is not inside any repository — it is (at most) a container of them.
+        log.warn(
+            `${root} is not inside a git repository: ${contained.length} repository/ies found directly inside it, ` +
+                "the rest of the folder has to be scanned from disk (slow on large trees)."
+        );
         for (const repo of contained) addGitScope(repo, repo);
         scopes.push({ kind: "walk", dir: root, excludeDirs: contained });
     }
 
+    log.debug(`Planned ${scopes.length} search scope(s) in ${elapsed()} ms: ${formatList(scopes.map(describeScope))}`);
     return scopes;
+}
+
+function describeScope(scope: SearchScope): string {
+    if (scope.kind === "walk") {
+        return `walk ${scope.dir}` + (scope.excludeDirs.length > 0 ? ` (−${scope.excludeDirs.length} repo dirs)` : "");
+    }
+    return `git ${scope.dir}` + (scope.repoTop === scope.dir ? "" : ` (repo ${scope.repoTop})`);
 }

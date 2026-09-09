@@ -24,6 +24,8 @@ src/
 ├── utils/
 │   ├── asyncUtils.ts             — delay()
 │   ├── commontUtils.ts           — intersperse(), regexMatchCount()
+│   ├── logger.ts                 — vscode-free logging seam: scoped loggers + timers
+│   ├── vscodeLogger.ts           — LogOutputChannel adapter, installed on activation
 │   └── jsonPreprocessor.ts       — extracts stack trace from JSON strings
 └── webview/
     ├── StackTraceWebViewPanel.ts — wrapper around vscode.WebviewView (host side)
@@ -234,7 +236,41 @@ Uses the standard VS Code Message Passing API.
 | `selectPrevStackTrace` | `executeSelectPrevStackTraceCommand` | Navigate backward |
 | `selectNextStackTrace` | `executeSelectNextStackTraceCommand` | Navigate forward |
 | `enableVcsIntegration` | `executeEnableVcsIntegrationCommand` | Enable VCS |
+| `showLogs` | — | Reveal the "Stack Trace Analyzer" output channel |
 | `disableVcsIntegration` | `executeDisableVcsIntegrationCommand` | Disable VCS |
+
+---
+
+## Logging
+
+Everything the file search does is traced to a `vscode.LogOutputChannel` named
+**Stack Trace Analyzer** (`Stack Trace Analyzer: Show logs`, or the Output panel). The channel is a
+log channel, so the *level* is the user's to pick via **Developer: Set Log Level…** — no setting of
+our own. Info is the default; the timings below live at Debug.
+
+The resolver core (`src/native/`) must stay importable without the VS Code runtime, so it never
+touches an `OutputChannel`. `utils/logger.ts` is the seam instead:
+
+- `createScopedLogger(scope)` — a `Logger` prefixing every message with `[scope]`; it resolves the
+  sink lazily, so module-level loggers work no matter when the sink is installed.
+- `setLogger(logger)` — installs the process-wide sink. The default is a no-op, which is what unit
+  tests get: they never install one and pay nothing.
+- `startTimer()` / `formatList()` — elapsed whole milliseconds, and list rendering that stays short.
+
+`extension.ts` creates the channel on activation and installs `createVscodeLogger(channel)`.
+
+What each level carries:
+
+| Level | Content |
+|---|---|
+| `info` | One line per phase: which searcher was picked and why, parse / search / VCS durations, how many frames resolved. |
+| `debug` | The search plan, each ladder stage (resolved / left / ms), each `git ls-files` call, each disk walk, each legacy `findFiles` frame. |
+| `trace` | `git rev-parse` probes. |
+| `warn` | The slow or degraded paths: a workspace folder that is not in a repository (so it gets walked), a git call or walk over ~1.5 s, and — previously swallowed silently — the fast searcher throwing and falling back to VS Code's workspace search. |
+
+The intent is that a "why was the search slow?" question is answerable from one Debug-level run:
+whether the git index was used at all, which scope ate the time, and how much of it each rung of the
+ladder cost.
 
 ---
 

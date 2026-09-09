@@ -4,6 +4,9 @@ import { addCandidateTo, basenameLower, computeSmartCandidatePathsPure, rankCand
 import { IGNORED_DIRS, walkForBasenames } from "./fsWalk";
 import { gitLsFilesByBasenames, gitListIgnoredEntries } from "./gitCli";
 import { SearchScope, planSearchScopes } from "./searchScopes";
+import { createScopedLogger, formatList, startTimer } from "../utils/logger";
+
+const log = createScopedLogger("resolve");
 
 // vscode-free core of the fast file searcher. It resolves stack-trace file paths
 // to absolute on-disk paths inside the given roots.
@@ -234,7 +237,11 @@ export async function resolveFilePaths(
     // the workspace folders.
     const anchors = [...new Set([...roots, ...scopes.map(scope => (scope.kind === "git" ? scope.repoTop : scope.dir))])];
 
+    const totalElapsed = startTimer();
+    log.debug(`Resolving ${distinct.length} distinct path(s) against anchors: ${formatList(anchors)}`);
+
     // Stage 1: smart candidates — a direct stat, highest confidence, no git.
+    const smartElapsed = startTimer();
     let pending: string[] = [];
     for (const filePath of distinct) {
         if (signal?.aborted) {
@@ -251,6 +258,10 @@ export async function resolveFilePaths(
         if (found != undefined) result.set(filePath, found);
         else pending.push(filePath);
     }
+    log.debug(
+        `Stage 1 (smart candidate): resolved ${distinct.length - pending.length}/${distinct.length} ` +
+            `in ${smartElapsed()} ms, ${pending.length} left.`
+    );
 
     // Candidates accumulate across stages so a later, wider stage can still lose to
     // a better suffix match an earlier one found.
@@ -276,37 +287,54 @@ export async function resolveFilePaths(
         pending = stillPending;
     };
 
-    const runStage = async (collect: (wanted: Set<string>) => Promise<Map<string, string[]>>): Promise<void> => {
+    const runStage = async (
+        name: string,
+        collect: (wanted: Set<string>) => Promise<Map<string, string[]>>
+    ): Promise<void> => {
         if (pending.length === 0 || signal?.aborted) return;
         const wanted = wantedOf(pending);
         if (wanted.size === 0) return;
+        const before = pending.length;
+        const elapsed = startTimer();
         mergeCandidates(candidates, await collect(wanted), wanted);
         await resolvePending();
+        log.debug(
+            `Stage ${name}: resolved ${before - pending.length}/${before} path(s) ` +
+                `in ${elapsed()} ms, ${pending.length} left.`
+        );
     };
 
     if (scopes.length > 0) {
         // Stage 2: the primary pass — git per git scope, a walk per walk scope.
-        await runStage(wanted => collectFromScopes(wanted, scopes, signal));
+        await runStage("2 (git index / disk walk per scope)", wanted => collectFromScopes(wanted, scopes, signal));
 
         // Stage 3: widen to the repository top for workspace folders that are only a
         // subdirectory of their repository. `git ls-files` from a subdirectory reports
         // that subtree only, so anything living in a sibling folder of the repo needs
         // this — but it is a whole-repo scan, so it runs only on what is still missing.
         const widenedTops = distinctRepoTops(scopes, true);
-        if (widenedTops.length > 0) {
-            await runStage(wanted => collectFromGitDirs(wanted, widenedTops, signal));
+        if (widenedTops.length > 0 && pending.length > 0) {
+            log.debug(`Widening the search to ${widenedTops.length} repository top(s): ${formatList(widenedTops)}`);
+            await runStage("3 (widened to repository top)", wanted => collectFromGitDirs(wanted, widenedTops, signal));
         }
 
         // Stage 4: the git-ignored areas (generated code). Build output and
         // dependency directories stay excluded, matching what the walk prunes.
         const allTops = distinctRepoTops(scopes, false);
-        if (allTops.length > 0) {
-            await runStage(wanted => collectFromIgnoredAreas(wanted, allTops, signal));
+        if (allTops.length > 0 && pending.length > 0) {
+            await runStage("4 (git-ignored areas)", wanted => collectFromIgnoredAreas(wanted, allTops, signal));
         }
+    } else {
+        log.warn("No search scope to look in — is a folder open in this window?");
     }
 
     for (const filePath of pending) {
         if (!result.has(filePath)) result.set(filePath, undefined);
     }
+    log.debug(
+        `Done in ${totalElapsed()} ms: ${distinct.length - pending.length}/${distinct.length} resolved` +
+            (signal?.aborted ? " (aborted)" : "") +
+            (pending.length > 0 ? `. Unresolved: ${formatList(pending)}` : ".")
+    );
     return result;
 }

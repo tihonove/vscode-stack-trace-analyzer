@@ -2,6 +2,9 @@ import * as vscode from "vscode";
 import { FileSearcher, VscodeWorkspaceFileSearcher } from "../workspaceFileResolver";
 import { IProgressReporter } from "../utils/progressTracker";
 import { IndexedFileSearcher } from "./indexedFileSearcher";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("searcher");
 
 /**
  * Builds the file searcher used by the extension from the `stack-trace-analyzer.search.*`
@@ -20,8 +23,13 @@ export function createFileSearcher(): FileSearcher {
 
     // Priority order, fastest/preferred first. (Future: search.native, search.filesystem.)
     if (config.get<boolean>("search.gitIndex", false)) {
+        log.info("Using the git-index searcher (stack-trace-analyzer.search.gitIndex is on).");
         return new CompositeFileSearcher(new IndexedFileSearcher({ useGitIndex: true }), fallback);
     }
+    log.info(
+        "Using VS Code workspace search — the slow path on large repositories. " +
+            "Enable stack-trace-analyzer.search.gitIndex to resolve paths through the git index instead."
+    );
     return fallback;
 }
 
@@ -38,7 +46,8 @@ class CompositeFileSearcher implements FileSearcher {
     ): Promise<string | undefined> {
         try {
             return await this.primary.findFile(filePath, cancellationToken, progress);
-        } catch {
+        } catch (error) {
+            log.warn("The fast searcher failed; falling back to VS Code workspace search.", error);
             return await this.fallback.findFile(filePath, cancellationToken, progress);
         }
     }
@@ -52,8 +61,14 @@ class CompositeFileSearcher implements FileSearcher {
             if (this.primary.findFiles != undefined) {
                 return await this.primary.findFiles(filePaths, cancellationToken, progress);
             }
-        } catch {
+            log.debug("The fast searcher has no batch mode; resolving path by path with VS Code workspace search.");
+        } catch (error) {
             // fall through to the per-path fallback below
+            log.warn(
+                `The fast searcher failed on a batch of ${filePaths.length} path(s); ` +
+                    "falling back to VS Code workspace search.",
+                error
+            );
         }
         const result = new Map<string, string | undefined>();
         for (const filePath of filePaths) {

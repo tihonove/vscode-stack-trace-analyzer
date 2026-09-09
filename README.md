@@ -28,6 +28,14 @@ Stack trace analyzer - Easy way to analyze stack traces from any language and so
 
 If your stack trace is not working, please open an issue on [GitHub](https://github.com/tihonove/vscode-stack-trace-analyzer/issues).
 
+### When the search is slow or finds nothing
+
+Run `Stack Trace Analyzer: Show logs` to open the extension's log. It reports which search strategy
+was used and how long each phase took. For the full detail — the search plan, every `git ls-files`
+call and every directory scan with its duration — raise the level first with
+`Developer: Set Log Level…` → *Stack Trace Analyzer* → *Debug*, then analyze the stack trace again.
+Attaching that log to an issue helps a lot.
+
 Successfully tested on the following languages:
 
 - C
