@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import * as vscode from "vscode";
 import { Token } from "../TokenMeta";
 
@@ -48,13 +49,14 @@ export class StackTraceWebViewPanel {
         this.webviewView.webview.postMessage({ type: "clearAnalyizedStackTraces" });
     }
 
-    private randomString10(): string {
-        return (Math.random() + 1).toString(36).substring(2);
+    private createNonce(): string {
+        return randomBytes(16).toString("base64");
     }
 
     private getHtmlForWebview() {
         const extensionUri = this.context.extensionUri;
-        const nonce = this.randomString10();
+        const nonce = this.createNonce();
+        const cspSource = this.webviewView.webview.cspSource;
         const webviewCss = this.webviewView.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "client", "webview.css"));
         const webviewJs = this.webviewView.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", "client", "webview.js"));
 
@@ -62,10 +64,10 @@ export class StackTraceWebViewPanel {
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
-                <meta http-equiv="Content-Security-Policy" content="content="default-src 'none'; style-src ${this.webviewView.webview.cspSource}; script-src ${this.webviewView.webview.cspSource};">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src ${cspSource} 'nonce-${nonce}';">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Stack trace analyzer</title>
-                <script>
+                <script nonce="${nonce}">
                     var exports = {};
                 </script>
                 <link nonce="${nonce}" rel="stylesheet" href="${webviewCss}" />
