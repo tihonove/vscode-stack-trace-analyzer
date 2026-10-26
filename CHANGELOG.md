@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Versions ending in
 `-pre` were published to the pre-release channel only.
 
+## [1.18.1] - 2026-10-26
+
+### Bug Fixes
+
+- Make the webview content security policy actually apply
+
 ## [1.18.0] - 2026-09-09
 
 ### Features
