@@ -34,29 +34,21 @@ chasing.
 Pasting a JSON log line works too: if the trace is embedded in a JSON string, it is unwrapped and unescaped
 automatically, so a Sentry or Loki payload can go in whole.
 
+Any language works — Java, C#, Python, JavaScript/TypeScript, Go, Rust, PHP, Ruby, C, and anything else
+that prints `path:line`.
+
 ### When the paths don't match
 
 This is the part that usually matters, and it is why the extension exists.
 
 A trace produced on a build agent, in a container, or on a teammate's machine carries paths that do not
-exist on yours. Stack Trace Analyzer never requires them to. For each frame it:
+exist on yours. That is fine: Stack Trace Analyzer finds the matching file in your workspace by name and
+by as much of the path as lines up, so `C:/BuildAgent/work/<hash>/my-repo/src/Utils/Helper.cs` opens
+`src/Utils/Helper.cs` in your local `my-repo` — and wins over an unrelated `Helper.cs` elsewhere. No
+configuration, no path mappings.
 
-1. looks for your workspace folder's — or repository's — directory name *inside* the trace path, and if it
-   finds it, builds the local path directly and checks it with a single `stat`. So
-   `C:/BuildAgent/work/<hash>/my-repo/src/Utils/Helper.cs` resolves to `/home/you/my-repo/src/Utils/Helper.cs`
-   with no searching at all;
-2. otherwise asks git for the file name via `git ls-files` — per repository, honouring `.gitignore`, and
-   handling the awkward layouts: several repositories inside one workspace folder, repositories nested
-   inside a repository, and a workspace folder that is only a subdirectory of a much bigger repository
-   (the search widens to the repository root);
-3. walks the filesystem only where git cannot reach, including git-ignored directories that hold generated
-   code;
-4. ranks whatever it found by the longest matching path suffix, so `src/Utils/Helper.cs` wins over an
-   unrelated `Helper.cs` elsewhere in the tree.
-
-Using the git index rather than a workspace-wide file search is what makes this usable on a large
-repository: on a Java monorepo, one 30-frame trace went from **82 seconds to 5**. It is on by default; see
-`stack-trace-analyzer.search.gitIndex` below.
+It stays fast on big repositories too: the search goes through git rather than scanning the disk, and
+setups with several repositories or nested repositories are handled.
 
 ## Coming from IntelliJ IDEA?
 
@@ -66,27 +58,8 @@ This is the "Analyze Stack Trace" feature you are missing, with the same job and
 |---|---|---|
 | Entry point | A dialog you paste into | A command that reads the clipboard |
 | Results | One analysis at a time | A panel keeping the last 10 traces, with next/previous |
-| Unmatched paths | Resolved within the project's modules | Matched by path suffix against the git index — CI and container paths resolve with no configuration |
+| Unmatched paths | Resolved within the project's modules | Matched against your workspace by path — CI and container paths resolve with no configuration |
 | Thread dumps | Analyzes thread dumps and deadlocks | Not supported |
-
-## Languages and formats
-
-| Language | A frame it recognises |
-|---|---|
-| C | `/workspaces/postgres/src/backend/main/main.c:199` |
-| C# | `at Tools.IdHelperCore.CheckFormatId(Int32 id) in /builds/forms/Tools/IdHelperCore.cs:line 52` |
-| Go | `/home/user/project/main.go:15 +0x39` |
-| Java | `at Example.printLength(NullPointerExceptionExample.java:3)` |
-| JavaScript / TypeScript | `at Object.<anonymous> (C:\path\to\file.js:10:15)`, `ModelNormalizer.ts:125:18` |
-| PHP | `C:\sites\wonderfulproject\script.php:40`, `/var/www/html/lib/helper.php(25)` |
-| Python | `File "/home/user/project/src/main.py", line 42, in main` |
-| Ruby | ``from maths_is_hard.rb:2:in `divide'`` |
-| Rust | `src/main.rs:10:9` |
-
-These nine have dedicated test suites, but the list is not a limit: the general matcher picks up anything
-shaped like `path:line` or `path:line:column`, so other languages and plain log formats usually work too.
-If yours does not, [open an issue](https://github.com/tihonove/vscode-stack-trace-analyzer/issues) with a
-sample — a new format is usually a small, self-contained addition.
 
 ## Commands and settings
 
@@ -104,24 +77,20 @@ Everything lives in the Command Palette; the extension does not claim any keyboa
 
 | Setting | Default | What it does |
 |---|---|---|
-| `stack-trace-analyzer.search.gitIndex` | `true` | Resolve paths through the git index. Turning it off falls back to VS Code's workspace search, which is markedly slower on large repositories. |
+| `stack-trace-analyzer.search.gitIndex` | `true` | Find files through git. Turn it off only if links go missing — VS Code's own search is used instead, which is much slower on large repositories. |
 
 ## FAQ
 
 **My stack trace isn't recognised.**
 [Open an issue](https://github.com/tihonove/vscode-stack-trace-analyzer/issues) and paste the trace.
-Parsing is per-format and the formats are independent of each other, so adding one rarely disturbs the rest.
 
 **The frames aren't linked — my paths don't match.**
-Run `Stack Trace Analyzer: Show logs`. At the default level it reports which search strategy ran and how
-long each phase took. For the full picture — the search plan, every git query and every directory scan with
-its duration — set the level to Debug first via `Developer: Set Log Level…` → *Stack Trace Analyzer*, then
-analyze the trace again. That log is also the most useful thing to attach to an issue.
+Run `Stack Trace Analyzer: Show logs` to see what the search did. For more detail, switch the level to
+Debug (`Developer: Set Log Level…` → *Stack Trace Analyzer*) and analyze the trace again — that log is the
+most useful thing to attach to an issue.
 
 **Does it send anything anywhere?**
-No. There are no HTTP calls anywhere in the extension, no telemetry, and no runtime dependencies at all.
-Git runs as a local command, and the last-commit tooltips come from VS Code's own built-in git extension.
-Your stack traces never leave your machine.
+No. No network calls, no telemetry — your stack traces never leave your machine.
 
 **What is the tooltip on a resolved frame?**
 With VCS integration on, each resolved file is looked up in git history and the commit that last touched it
