@@ -52,6 +52,8 @@
     margin-top: 4px;
     font-family: var(--vscode-editor-font-family);
     min-width: 250px;
+    max-width: calc(100vw - 16px);
+    box-sizing: border-box;
     overflow: hidden;
 }
 
@@ -86,6 +88,7 @@
     color: var(--vscode-foreground);
     font-weight: 500;
     flex: 1;
+    min-width: 0;
     text-overflow: ellipsis;
     overflow: hidden;
 }

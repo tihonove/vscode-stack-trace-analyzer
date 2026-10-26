@@ -33,7 +33,9 @@ function createTooltip(lastCommit: CommitInfo): HTMLElement | null | undefined {
     const commitMessageElement = tooltip.querySelector(".commit-message") as HTMLElement;
     if (commitMessageElement != null) {
         if (lastCommit.message) {
-            commitMessageElement.textContent = lastCommit.message;
+            const fullMessage = lastCommit.message.trim();
+            commitMessageElement.textContent = fullMessage.split(/\r?\n/, 1)[0] ?? "";
+            commitMessageElement.title = fullMessage;
         } else {
             commitMessageElement.style.display = "none";
         }
@@ -79,6 +81,16 @@ function createTooltip(lastCommit: CommitInfo): HTMLElement | null | undefined {
     return tooltip;
 }
 
+function keepTooltipInViewport(tooltip: HTMLElement) {
+    const margin = 8;
+    tooltip.style.left = "";
+    const rect = tooltip.getBoundingClientRect();
+    const overflow = rect.right - (document.documentElement.clientWidth - margin);
+    if (overflow > 0) {
+        tooltip.style.left = -Math.min(overflow, rect.left - margin) + "px";
+    }
+}
+
 function showLines(lines: Token[][]) {
     const element = document.querySelector("#current-stack-trace") as HTMLElement;
     if (element == null) return;
@@ -104,6 +116,10 @@ function showLines(lines: Token[][]) {
                         const tooltip = createTooltip(lastCommit);
                         if (tooltip != null) {
                             tokenElement.appendChild(tooltip);
+                            const tooltipElement = tokenElement.querySelector(".tooltip") as HTMLElement | null;
+                            if (tooltipElement != null) {
+                                tokenElement.onmouseenter = () => keepTooltipInViewport(tooltipElement);
+                            }
                         }
                     }
                 }
