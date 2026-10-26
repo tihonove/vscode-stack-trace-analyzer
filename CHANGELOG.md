@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. Versions ending in
 `-pre` were published to the pre-release channel only.
 
+## [1.18.3] - 2026-10-26
+
+### Documentation
+
+- Simplify the README for the listing page
+
 ## [1.18.2] - 2026-10-26
 
 ### Bug Fixes
